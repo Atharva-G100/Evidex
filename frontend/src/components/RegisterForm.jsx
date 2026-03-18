@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import styles from './RegisterForm.module.css'
+import { useWallet } from '../hooks/useWallet'
+import { getEvidenceRegistryContract } from '../contracts/evidenceRegistry'
 
 const RegisterForm = ({ onBack }) => {
+    const { account, isCorrectNetwork, connect, provider, getSigner, error: walletError, setError: setWalletError } = useWallet()
     const [file, setFile] = useState(null)
     const [hash, setHash] = useState('')
     const [isHashing, setIsHashing] = useState(false)
@@ -13,18 +16,22 @@ const RegisterForm = ({ onBack }) => {
     })
     const [status, setStatus] = useState('idle') // idle, hashing, ready, registering, success
     const [txDetails, setTxDetails] = useState(null)
+    const [errorMsg, setErrorMsg] = useState(null)
 
     const handleFileChange = (e) => {
         const selectedFile = e.target.files[0]
         setFile(selectedFile)
         setHash('')
         setStatus('idle')
+        setTxDetails(null)
+        setErrorMsg(null)
     }
 
     const generateHash = async () => {
         if (!file) return
         setIsHashing(true)
         setStatus('hashing')
+        setErrorMsg(null)
 
         try {
             // Simulate "Working" delay for effect
@@ -44,19 +51,66 @@ const RegisterForm = ({ onBack }) => {
         }
     }
 
-    const registerEvidence = () => {
+    const registerEvidence = async () => {
         if (!hash) return
+
+        setErrorMsg(null)
+
+        if (!account) {
+            setErrorMsg('Wallet not connected. Please connect MetaMask first.')
+            return
+        }
+
+        if (!isCorrectNetwork) {
+            setErrorMsg('Wrong network. Please switch MetaMask to Sepolia.')
+            return
+        }
+
+        if (!formData.caseId.trim() || !formData.officerName.trim()) {
+            setErrorMsg('Please enter both Case ID and Officer Name before registering.')
+            return
+        }
+
         setStatus('registering')
 
-        // Mock blockchain transaction
-        setTimeout(() => {
-            setStatus('success')
+        try {
+            // Ensure wallet error (if any) is cleared once user proceeds.
+            setWalletError?.(null)
+
+            const signer = await getSigner()
+            const contract = getEvidenceRegistryContract(signer)
+
+            const tx = await contract.registerEvidence(hash, formData.caseId.trim(), formData.officerName.trim())
+            const receipt = await tx.wait()
+
+            let blockTimestampIso = null
+            try {
+                if (provider && receipt?.blockNumber != null) {
+                    const block = await provider.getBlock(receipt.blockNumber)
+                    if (block?.timestamp) {
+                        blockTimestampIso = new Date(Number(block.timestamp) * 1000).toISOString()
+                    }
+                }
+            } catch {
+                // Non-critical.
+            }
+
             setTxDetails({
-                txHash: '0x' + Array(64).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join(''),
-                blockNumber: Math.floor(Math.random() * 1000000) + 5000000,
-                timestamp: new Date().toISOString()
+                txHash: tx.hash,
+                blockNumber: receipt?.blockNumber,
+                timestamp: blockTimestampIso || new Date().toISOString()
             })
-        }, 2000)
+            setStatus('success')
+        } catch (e) {
+            // Common MetaMask + EVM failure cases
+            if (e?.code === 4001) {
+                setErrorMsg('Transaction rejected in MetaMask.')
+            } else {
+                const msg = e?.shortMessage || e?.reason || e?.message || 'Transaction failed.'
+                setErrorMsg(msg)
+            }
+            setStatus('ready')
+        }
     }
 
     return (
@@ -168,6 +222,20 @@ const RegisterForm = ({ onBack }) => {
                     </div>
                 )}
             </div>
+
+            {/* Wallet / error hints */}
+            {(walletError || errorMsg) && (
+                <div style={{ marginTop: '1rem', padding: '0.9rem 1rem', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', background: 'rgba(255,255,255,0.03)' }}>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.9rem', opacity: 0.95 }}>
+                        {errorMsg || walletError}
+                    </div>
+                    {!account && (
+                        <div style={{ marginTop: '0.6rem' }}>
+                            <button className={styles.actionBtn} onClick={connect}>Connect MetaMask</button>
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* Success State */}
             {status === 'success' && txDetails && (

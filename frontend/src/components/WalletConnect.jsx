@@ -1,29 +1,28 @@
-import { useState } from 'react'
+import { useMemo } from 'react'
 import styles from './WalletConnect.module.css'
+import { useWallet } from '../hooks/useWallet'
 
 const WalletConnect = () => {
-    const [account, setAccount] = useState(null)
+    const { account, connect, isConnecting } = useWallet()
 
-    const connectWallet = () => {
-        // Mock connection
-        setTimeout(() => {
-            setAccount('0x71C...9A23')
-        }, 500)
-    }
+    const displayAccount = useMemo(() => {
+        if (!account) return null
+        return `${account.slice(0, 6)}...${account.slice(-4)}`
+    }, [account])
 
     return (
         <button
             className={styles.connectBtn}
-            onClick={connectWallet}
-            disabled={!!account}
+            onClick={connect}
+            disabled={!!account || isConnecting}
         >
             {account ? (
                 <span className={styles.connected}>
                     <span className={styles.dot}></span>
-                    {account}
+                    {displayAccount}
                 </span>
             ) : (
-                "Connect Wallet"
+                isConnecting ? 'Connecting…' : 'Connect Wallet'
             )}
         </button>
     )

@@ -1,12 +1,16 @@
 import { useState } from 'react'
 import styles from './VerifyForm.module.css'
+import { useWallet } from '../hooks/useWallet'
+import { getEvidenceRegistryContract } from '../contracts/evidenceRegistry'
 
 const VerifyForm = ({ onBack }) => {
+    const { account, isCorrectNetwork, connect, provider, error: walletError, setError: setWalletError } = useWallet()
     const [file, setFile] = useState(null)
     const [hash, setHash] = useState('')
     const [isHashing, setIsHashing] = useState(false)
     const [status, setStatus] = useState('idle') // idle, hashing, ready, verifying, success, failure
     const [evidenceData, setEvidenceData] = useState(null)
+    const [errorMsg, setErrorMsg] = useState(null)
 
     const handleFileChange = (e) => {
         const selectedFile = e.target.files[0]
@@ -14,12 +18,14 @@ const VerifyForm = ({ onBack }) => {
         setHash('')
         setStatus('idle')
         setEvidenceData(null)
+        setErrorMsg(null)
     }
 
     const generateHash = async () => {
         if (!file) return
         setIsHashing(true)
         setStatus('hashing')
+        setErrorMsg(null)
 
         try {
             // Delay for effect
@@ -39,26 +45,54 @@ const VerifyForm = ({ onBack }) => {
         }
     }
 
-    const verifyEvidence = () => {
+    const verifyEvidence = async () => {
         if (!hash) return
+
+        setErrorMsg(null)
+
+        if (!account) {
+            setErrorMsg('Wallet not connected. Please connect MetaMask first.')
+            return
+        }
+
+        if (!isCorrectNetwork) {
+            setErrorMsg('Wrong network. Please switch MetaMask to Sepolia.')
+            return
+        }
+
         setStatus('verifying')
 
-        // Mock verification logic
-        setTimeout(() => {
-            const isSuccess = true
+        try {
+            setWalletError?.(null)
 
-            if (isSuccess) {
-                setStatus('success')
-                setEvidenceData({
-                    officerName: 'Officer John Doe',
-                    caseId: 'CCS-2026-X01',
-                    timestamp: '12 Feb 2026 – 10:12 AM',
-                    status: 'Immutable / Verified'
-                })
-            } else {
+            if (!provider) throw new Error('Wallet provider not available.')
+            const contract = getEvidenceRegistryContract(provider)
+            const [caseId, officerName, uploader, timestamp] = await contract.getEvidence(hash)
+
+            const ts = Number(timestamp)
+            if (!ts) {
                 setStatus('failure')
+                return
             }
-        }, 2000)
+
+            const when = new Date(ts * 1000).toLocaleString('en-GB', {
+                day: '2-digit', month: 'short', year: 'numeric',
+                hour: '2-digit', minute: '2-digit'
+            })
+
+            setEvidenceData({
+                officerName,
+                caseId,
+                uploader,
+                timestamp: when,
+                status: 'Immutable / Verified'
+            })
+            setStatus('success')
+        } catch (e) {
+            const msg = e?.shortMessage || e?.reason || e?.message || 'Verification failed.'
+            setErrorMsg(msg)
+            setStatus('ready')
+        }
     }
 
     return (
@@ -131,6 +165,7 @@ const VerifyForm = ({ onBack }) => {
                         <p><strong>Status:</strong> <span className={styles.tagSuccess}>{evidenceData.status}</span></p>
                         <p><strong>Registrar:</strong> {evidenceData.officerName}</p>
                         <p><strong>Case ID:</strong> {evidenceData.caseId}</p>
+                        <p><strong>Uploader:</strong> {evidenceData.uploader}</p>
                         <p><strong>Timestamp:</strong> {evidenceData.timestamp}</p>
                     </div>
                 </div>
@@ -145,6 +180,20 @@ const VerifyForm = ({ onBack }) => {
                     <div className={styles.resultDetails}>
                         <p>CRITICAL ALERT: The cryptographic hash of this file does not match any record on the registry.</p>
                     </div>
+                </div>
+            )}
+
+            {/* Wallet / error hints */}
+            {(walletError || errorMsg) && (
+                <div style={{ marginTop: '1rem', padding: '0.9rem 1rem', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', background: 'rgba(255,255,255,0.03)' }}>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.9rem', opacity: 0.95 }}>
+                        {errorMsg || walletError}
+                    </div>
+                    {!account && (
+                        <div style={{ marginTop: '0.6rem' }}>
+                            <button className={styles.actionBtn} onClick={connect}>Connect MetaMask</button>
+                        </div>
+                    )}
                 </div>
             )}
         </div>
