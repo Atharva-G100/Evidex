@@ -1,7 +1,7 @@
 {
   "name": "EvidenceRegistry",
-  "address": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
-  "network": "hardhat",
-  "timestamp": "2026-03-19T06:45:11.380Z",
-  "signer": "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266"
+  "address": "0xC28A4ffA6291D1e020BCD84903c7893A4B420C2f",
+  "network": "sepolia",
+  "timestamp": "2026-03-19T08:10:27.325Z",
+  "signer": "0x844bdc25ca75d285681c5babff318ddbf9932005"
 }

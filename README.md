@@ -16,8 +16,8 @@
 
 1. `cd backend` and `npm install`.
 2. Copy `.env.example` to `.env` and populate:
-   - `SEPOLIA_RPC_URL` (or another network RPC) for deployments.
-   - `PRIVATE_KEY` for the deployer account (Sepolia test ETH only).
+   - `SEPOLIA_RPC_URL` (paste the Sepolia RPC endpoint from your MetaMask developer account at [MetaMask Developer](https://developer.metamask.io/) or any provider such as Infura/Alchemy/QuickNode).
+   - `PRIVATE_KEY` for the deployer account (Sepolia test ETH only) exported from MetaMask.
    - `PINATA_JWT` + `PINATA_GATEWAY_BASE` when you wire in Pinata uploads later.
 3. `npm run compile` to build the contract.
 4. `npm run test` to execute the Hardhat suite (`backend/test/EvidenceRegistry.test.js` covers registration + dedup logic).

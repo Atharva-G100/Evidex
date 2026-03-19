@@ -1,5 +1,35 @@
 [
   {
+    "inputs": [],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "fileHash",
+        "type": "string"
+      },
+      {
+        "indexed": false,
+        "internalType": "enum EvidenceRegistry.CustodyStatus",
+        "name": "status",
+        "type": "uint8"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "timestamp",
+        "type": "uint256"
+      }
+    ],
+    "name": "CustodyStatusUpdated",
+    "type": "event"
+  },
+  {
     "anonymous": false,
     "inputs": [
       {
@@ -19,9 +49,40 @@
         "internalType": "uint256",
         "name": "timestamp",
         "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "ipfsCid",
+        "type": "string"
+      },
+      {
+        "indexed": false,
+        "internalType": "enum EvidenceRegistry.CustodyStatus",
+        "name": "status",
+        "type": "uint8"
       }
     ],
     "name": "EvidenceRegistered",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "investigator",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "bool",
+        "name": "granted",
+        "type": "bool"
+      }
+    ],
+    "name": "InvestigatorUpdated",
     "type": "event"
   },
   {
@@ -45,6 +106,11 @@
         "type": "string"
       },
       {
+        "internalType": "string",
+        "name": "",
+        "type": "string"
+      },
+      {
         "internalType": "address",
         "name": "",
         "type": "address"
@@ -53,6 +119,56 @@
         "internalType": "uint256",
         "name": "",
         "type": "uint256"
+      },
+      {
+        "internalType": "enum EvidenceRegistry.CustodyStatus",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "investigator",
+        "type": "address"
+      }
+    ],
+    "name": "grantInvestigator",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "investigator",
+        "type": "address"
+      }
+    ],
+    "name": "isInvestigator",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "owner",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
       }
     ],
     "stateMutability": "view",
@@ -74,9 +190,50 @@
         "internalType": "string",
         "name": "officerName",
         "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "ipfsCid",
+        "type": "string"
+      },
+      {
+        "internalType": "enum EvidenceRegistry.CustodyStatus",
+        "name": "status",
+        "type": "uint8"
       }
     ],
     "name": "registerEvidence",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "investigator",
+        "type": "address"
+      }
+    ],
+    "name": "revokeInvestigator",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "fileHash",
+        "type": "string"
+      },
+      {
+        "internalType": "enum EvidenceRegistry.CustodyStatus",
+        "name": "status",
+        "type": "uint8"
+      }
+    ],
+    "name": "setCustodyStatus",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
