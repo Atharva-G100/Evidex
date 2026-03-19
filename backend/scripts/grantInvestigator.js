@@ -1,20 +1,28 @@
+require("dotenv").config();
 const hre = require("hardhat");
 
 async function main() {
-  const [owner] = await hre.ethers.getSigners();
+  const contractAddress = process.env.CONTRACT_ADDRESS;
+  const investigatorAddress = process.env.INVESTIGATOR_ADDRESS;
+
+  if (!contractAddress) {
+    throw new Error("Missing CONTRACT_ADDRESS in backend/.env");
+  }
+
+  if (!investigatorAddress) {
+    throw new Error("Missing INVESTIGATOR_ADDRESS in backend/.env");
+  }
+
   const registry = await hre.ethers.getContractAt(
     "EvidenceRegistry",
-    "0xdce10d518FF7c619ff2CAd15faaf428A0911CA44"
+    contractAddress
   );
-  const tx = await registry.grantInvestigator(
-    "0x12C10Da5C9843Df0ba60419B42F32D8227b76C39"
-  );
-  await tx.wait();
-  console.log(
-    "Investigator granted to 0x12C10Da5C9843Df0ba60419B42F32D8227b76C39"
-  );
-}
 
+  const tx = await registry.grantInvestigator(investigatorAddress);
+  await tx.wait();
+
+  console.log(`Investigator granted to ${investigatorAddress}`);
+}
 main().catch((error) => {
   console.error(error);
   process.exitCode = 1;
