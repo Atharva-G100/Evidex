@@ -21,8 +21,8 @@
    - `PINATA_JWT` + `PINATA_GATEWAY_BASE` when you wire in Pinata uploads later.
 3. `npm run compile` to build the contract.
 4. `npm run test` to execute the Hardhat suite (`backend/test/EvidenceRegistry.test.js` covers registration + dedup logic).
-5. `npm run deploy` to run `scripts/deploy.js --network sepolia` (or change `--network` to `hardhat` for local runs). The command produces `backend/artifacts/deployed.json`.
-6. `npm run sync-artifacts` so `frontend/src/contracts/{evidenceRegistryAbi.json,deployed.json}` match the latest ABI + address.
+5. Run `npm run deploy:all` to execute `deploy` followed by `sync-artifacts`; this publishes the contract to Sepolia and refreshes the frontend ABI/address in one step, writing metadata to `backend/artifacts/deployed.json`.
+6. Commit the synced `frontend/src/contracts/{evidenceRegistryAbi.json,deployed.json}` after shared deployments so teammates get the refreshed ABI/address without running `sync-artifacts` themselves. For local-only runs, skip committing the generated JSONs.
 
 ## Frontend setup & run steps
 
