@@ -99,7 +99,7 @@
 }
 
 /* Technical Icons */
-.iconContainer {
+.iconBadge {
     height: 80px;
     width: 80px;
     margin-bottom: 2rem;
@@ -108,39 +108,32 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(0, 0, 0, 0.3);
-    border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    transition: all 0.3s ease;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    overflow: hidden;
+    transition: transform 0.3s ease, border-color 0.3s ease;
 }
 
-.registerCard:hover .iconContainer {
-    border-color: var(--accent-blue);
-    background: rgba(47, 122, 249, 0.1);
+.card:hover .iconBadge {
+    transform: scale(1.04);
+    border-color: rgba(255, 255, 255, 0.4);
 }
 
-.verifyCard:hover .iconContainer {
-    border-color: var(--accent-green);
-    background: rgba(10, 255, 220, 0.1);
+.iconBadge svg {
+    width: 48px;
+    height: 48px;
+    stroke: currentColor;
+    stroke-width: 2;
+    fill: none;
 }
 
-.techIcon {
-    font-size: 2.5rem;
-    filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.2));
-    transition: all 0.3s ease;
-}
-
-.registerCard .techIcon {
+.registerCard .iconBadge {
     color: var(--accent-blue);
 }
 
-.verifyCard .techIcon {
+.verifyCard .iconBadge {
     color: var(--accent-green);
-}
-
-.card:hover .techIcon {
-    transform: scale(1.1);
-    filter: drop-shadow(0 0 15px currentColor);
 }
 
 
@@ -161,6 +154,142 @@
     position: relative;
     z-index: 1;
     max-width: 90%;
+}
+
+.adminPanel {
+    margin-top: 4rem;
+    background: rgba(10, 25, 47, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 2rem;
+    box-shadow: 0 15px 40px -10px rgba(0, 0, 0, 0.7);
+}
+
+.adminHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    gap: 0.8rem;
+}
+
+.adminLabel {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.2rem;
+    margin-bottom: 0.2rem;
+    text-transform: uppercase;
+}
+
+.adminValue {
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    word-break: break-all;
+}
+
+.copyButton {
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    background: transparent;
+    color: var(--text-primary);
+    padding: 0.6rem 1.4rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    letter-spacing: 0.4rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.copyButton:hover {
+    border-color: var(--accent-blue);
+}
+
+.formRow {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.5rem;
+}
+
+.panelInput {
+    flex: 1;
+    padding: 0.9rem 1rem;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+}
+
+.grantButton {
+    background: var(--accent-green);
+    border: none;
+    color: #000;
+    font-weight: 700;
+    padding: 0.9rem 1.8rem;
+    border-radius: 8px;
+    cursor: pointer;
+    letter-spacing: 0.2rem;
+    transition: background 0.2s ease;
+}
+
+.grantButton:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.helpText {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+}
+
+.statusMessage {
+    font-size: 0.85rem;
+    color: var(--accent-green);
+    margin-bottom: 0.8rem;
+}
+
+.listHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 1.6rem;
+    margin-bottom: 0.5rem;
+}
+
+.listBadge {
+    padding: 0.2rem 0.8rem;
+    border-radius: 999px;
+    background: rgba(47, 122, 249, 0.2);
+    font-size: 0.8rem;
+    letter-spacing: 0.2rem;
+}
+
+.list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 220px;
+    overflow-y: auto;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding-top: 0.6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.list li {
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.emptyLine {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    opacity: 0.7;
 }
 
 /* Tech decorations */
