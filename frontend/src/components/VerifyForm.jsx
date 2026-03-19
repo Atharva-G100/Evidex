@@ -67,7 +67,7 @@ const VerifyForm = ({ onBack }) => {
 
             if (!provider) throw new Error('Wallet provider not available.')
             const contract = getEvidenceRegistryContract(provider)
-            const [caseId, officerName, uploader, timestamp] = await contract.getEvidence(hash)
+            const [caseId, officerName, ipfsCid, uploader, timestamp, status] = await contract.getEvidence(hash)
 
             const ts = Number(timestamp)
             if (!ts) {
@@ -83,9 +83,10 @@ const VerifyForm = ({ onBack }) => {
             setEvidenceData({
                 officerName,
                 caseId,
+                ipfsCid,
                 uploader,
                 timestamp: when,
-                status: 'Immutable / Verified'
+                status: status === 0 ? 'Collected' : status === 1 ? 'Transferred' : 'Analyzed'
             })
             setStatus('success')
         } catch (e) {
@@ -165,6 +166,9 @@ const VerifyForm = ({ onBack }) => {
                         <p><strong>Status:</strong> <span className={styles.tagSuccess}>{evidenceData.status}</span></p>
                         <p><strong>Registrar:</strong> {evidenceData.officerName}</p>
                         <p><strong>Case ID:</strong> {evidenceData.caseId}</p>
+                        {evidenceData.ipfsCid && (
+                            <p><strong>IPFS CID:</strong> {evidenceData.ipfsCid}</p>
+                        )}
                         <p><strong>Uploader:</strong> {evidenceData.uploader}</p>
                         <p><strong>Timestamp:</strong> {evidenceData.timestamp}</p>
                     </div>

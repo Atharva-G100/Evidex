@@ -79,8 +79,16 @@ const RegisterForm = ({ onBack }) => {
 
             const signer = await getSigner()
             const contract = getEvidenceRegistryContract(signer)
+            const defaultStatus = 0 // CustodyStatus.COLLECTED
+            const ipfsPlaceholder = ''
 
-            const tx = await contract.registerEvidence(hash, formData.caseId.trim(), formData.officerName.trim())
+            const tx = await contract.registerEvidence(
+                hash,
+                formData.caseId.trim(),
+                formData.officerName.trim(),
+                ipfsPlaceholder,
+                defaultStatus
+            )
             const receipt = await tx.wait()
 
             let blockTimestampIso = null
