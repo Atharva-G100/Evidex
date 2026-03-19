@@ -1,6 +1,7 @@
 # Remix / Hardhat artifacts
 .states/
 artifacts/
+cache/
 
 # Node modules (if using Hardhat later)
 node_modules/
