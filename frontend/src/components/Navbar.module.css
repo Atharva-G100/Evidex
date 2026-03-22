@@ -25,9 +25,13 @@
 }
 
 .logo::before {
-    content: "🛡️";
-    /* Or a technical icon */
-    filter: grayscale(100%);
+    content: "";
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, rgba(10, 255, 220, 0.4), rgba(47, 122, 249, 0.4));
+    box-shadow: 0 0 10px rgba(10, 255, 220, 0.4);
+    display: inline-block;
 }
 
 .actions {

@@ -118,12 +118,25 @@ const VerifyForm = ({ onBack }) => {
                     <label htmlFor="verifyFileInput" className={styles.uploadLabel}>
                         {file ? (
                             <div className={styles.filePreview}>
-                                <span className={styles.fileIcon}>📄</span>
+                        <span className={styles.fileIcon}>
+                            <svg viewBox="0 0 48 48" role="img" aria-label="file">
+                                <rect x="10" y="6" width="28" height="36" rx="3" />
+                                <line x1="16" y1="18" x2="32" y2="18" />
+                                <line x1="16" y1="24" x2="32" y2="24" />
+                                <line x1="16" y1="30" x2="26" y2="30" />
+                            </svg>
+                        </span>
                                 <div className={styles.fileName}>{file.name}</div>
                             </div>
                         ) : (
                             <>
-                                <span className={styles.uploadIcon}>🔍</span>
+                                <span className={styles.uploadIcon}>
+                                    <svg viewBox="0 0 48 48" role="img" aria-label="scan">
+                                        <circle cx="20" cy="20" r="9" />
+                                        <circle cx="20" cy="20" r="5" />
+                                        <line x1="30" y1="30" x2="40" y2="40" />
+                                    </svg>
+                                </span>
                                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.9rem' }}>INITIATE FILE SCAN</span>
                             </>
                         )}
@@ -164,7 +177,11 @@ const VerifyForm = ({ onBack }) => {
             {status === 'success' && evidenceData && (
                 <div className={`${styles.resultBox} ${styles.success}`}>
                     <div className={styles.resultHeader}>
-                        <span className={styles.resultIcon}>🛡️</span>
+                        <span className={styles.resultIcon}>
+                            <svg viewBox="0 0 48 48" role="img" aria-label="shield">
+                                <path d="M24 4 L38 10 L38 22 C38 32 29 40 24 44 C19 40 10 32 10 22 L10 10 Z" />
+                            </svg>
+                        </span>
                         <h3>INTEGRITY CONFIRMED</h3>
                     </div>
                     <div className={styles.resultDetails}>
@@ -183,7 +200,13 @@ const VerifyForm = ({ onBack }) => {
             {status === 'failure' && (
                 <div className={`${styles.resultBox} ${styles.failure}`}>
                     <div className={styles.resultHeader}>
-                        <span className={styles.resultIcon}>❌</span>
+                        <span className={styles.resultIcon}>
+                            <svg viewBox="0 0 48 48" role="img" aria-label="alert">
+                                <circle cx="24" cy="24" r="18" />
+                                <line x1="24" y1="14" x2="24" y2="30" />
+                                <circle cx="24" cy="36" r="1.5" />
+                            </svg>
+                        </span>
                         <h3>INTEGRITY MISMATCH</h3>
                     </div>
                     <div className={styles.resultDetails}>

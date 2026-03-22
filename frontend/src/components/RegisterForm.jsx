@@ -141,13 +141,27 @@ const RegisterForm = ({ onBack }) => {
                         <label htmlFor="fileInput" className={styles.uploadLabel}>
                             {file ? (
                                 <div className={styles.filePreview}>
-                                    <span className={styles.fileIcon}>📄</span>
+                                    <span className={styles.fileIcon}>
+                                        <svg viewBox="0 0 48 48" role="img" aria-label="file">
+                                            <rect x="12" y="6" width="24" height="36" rx="3" />
+                                            <line x1="16" y1="18" x2="32" y2="18" />
+                                            <line x1="16" y1="24" x2="32" y2="24" />
+                                            <line x1="16" y1="30" x2="26" y2="30" />
+                                        </svg>
+                                    </span>
                                     <span className={styles.fileName}>{file.name}</span>
                                     <span className={styles.fileSize}>{(file.size / 1024).toFixed(2)} KB</span>
                                 </div>
                             ) : (
                                 <>
-                                    <span className={styles.uploadIcon}>☁️</span>
+                                    <span className={styles.uploadIcon}>
+                                        <svg viewBox="0 0 48 48" role="img" aria-label="upload">
+                                            <path d="M12 28h24a8 8 0 1 0-8-8" />
+                                            <path d="M24 34v-10" />
+                                            <path d="M20 30l4-4 4 4" />
+                                            <circle cx="28" cy="15" r="9" />
+                                        </svg>
+                                    </span>
                                     <span>Drag & Drop or Click to Upload</span>
                                 </>
                             )}
@@ -248,7 +262,15 @@ const RegisterForm = ({ onBack }) => {
             {/* Success State */}
             {status === 'success' && txDetails && (
                 <div className={styles.successBox}>
-                    <h3>✅ Evidence Secured on Blockchain</h3>
+                    <div className={styles.successHeader}>
+                        <span className={styles.successIcon}>
+                            <svg viewBox="0 0 48 48" role="img" aria-label="shield">
+                                <path d="M24 4 L36 10 L36 22 C36 30 29 36 24 40 C19 36 12 30 12 22 L12 10 Z" />
+                                <polyline points="16 22 22 28 32 18" />
+                            </svg>
+                        </span>
+                        <h3>Evidence Secured on Blockchain</h3>
+                    </div>
                     <div className={styles.txInfo}>
                         <p><strong>TX Hash:</strong> {txDetails.txHash}</p>
                         <p><strong>Block Height:</strong> {txDetails.blockNumber}</p>
