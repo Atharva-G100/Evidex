@@ -1,0 +1,18 @@
+# Root ignore file to keep generated artifacts out of Git.
+
+# Node dependencies
+node_modules/
+
+# Environment artifacts
+.env
+
+# Backend Hardhat cache
+backend/cache/
+backend/node_modules/
+
+# Frontend build output
+frontend/node_modules/
+frontend/dist/
+
+# Vite local server cache
+frontend/node_modules/.vite/
