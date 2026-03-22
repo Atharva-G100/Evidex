@@ -80,13 +80,18 @@ const VerifyForm = ({ onBack }) => {
                 hour: '2-digit', minute: '2-digit'
             })
 
+            const custodyStatus = Number(status)
+            let statusLabel = 'Analyzed'
+            if (custodyStatus === 0) statusLabel = 'Collected'
+            else if (custodyStatus === 1) statusLabel = 'Transferred'
+
             setEvidenceData({
                 officerName,
                 caseId,
                 ipfsCid,
                 uploader,
                 timestamp: when,
-                status: status === 0 ? 'Collected' : status === 1 ? 'Transferred' : 'Analyzed'
+                status: statusLabel
             })
             setStatus('success')
         } catch (e) {
