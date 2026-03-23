@@ -65,7 +65,27 @@ function resolveDeploymentAddress() {
 }
 
 function normaliseGatewayBase(value) {
-  return value.endsWith('/') ? value : `${value}/`
+  const trimmed = String(value || '').trim()
+  const withSlash = trimmed.endsWith('/') ? trimmed : `${trimmed}/`
+
+  try {
+    const url = new URL(withSlash)
+    const path = url.pathname || '/'
+    if (path === '/' || path === '') {
+      url.pathname = '/ipfs/'
+      return url.toString()
+    }
+    if (!path.endsWith('/')) {
+      url.pathname = `${path}/`
+    }
+    if (!url.pathname.includes('/ipfs/')) {
+      url.pathname = `${url.pathname.replace(/\/+$/, '')}/ipfs/`
+    }
+    return url.toString()
+  } catch {
+    if (withSlash.includes('/ipfs/')) return withSlash
+    return `${withSlash.replace(/\/+$/, '')}/ipfs/`
+  }
 }
 
 function buildAuthMessage({ address, chainId, timestamp }) {

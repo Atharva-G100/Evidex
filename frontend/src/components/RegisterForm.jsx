@@ -26,7 +26,10 @@ const RegisterForm = ({ onBack }) => {
         const day = String(date.getDate()).padStart(2, '0')
         const month = String(date.getMonth() + 1).padStart(2, '0')
         const year = date.getFullYear()
-        return `${day}/${month}/${year}`
+        const hours = String(date.getHours()).padStart(2, '0')
+        const minutes = String(date.getMinutes()).padStart(2, '0')
+        const seconds = String(date.getSeconds()).padStart(2, '0')
+        return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`
     }
 
     const getApiUrl = (path) => {
@@ -335,8 +338,21 @@ const RegisterForm = ({ onBack }) => {
                         <h3>Evidence Secured on Blockchain</h3>
                     </div>
                     <div className={styles.txInfo}>
-                        {uploadDetails?.cid && <p><strong>IPFS CID:</strong> {uploadDetails.cid}</p>}
-                        {uploadDetails?.gatewayUrl && <p><strong>IPFS URL:</strong> {uploadDetails.gatewayUrl}</p>}
+                        {uploadDetails?.cid && (
+                            <p>
+                                <strong>IPFS CID:</strong> {uploadDetails.cid}
+                                {uploadDetails?.gatewayUrl && (
+                                    <a
+                                        className={styles.inlineLink}
+                                        href={uploadDetails.gatewayUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                    >
+                                        Open
+                                    </a>
+                                )}
+                            </p>
+                        )}
                         {uploadDetails?.size != null && <p><strong>IPFS Size:</strong> {uploadDetails.size} bytes</p>}
                         <p><strong>TX Hash:</strong> {txDetails.txHash}</p>
                         <p><strong>Block Height:</strong> {txDetails.blockNumber}</p>

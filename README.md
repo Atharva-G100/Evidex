@@ -5,6 +5,7 @@
 - The React frontend hashes files locally, uploads the original file to Pinata through a protected backend API, and stores the returned CID on-chain.
 - The `backend/scripts/sync-artifacts.js` script keeps the frontend ABI and deployed address in sync with Hardhat artifacts.
 - The backend exposes `POST /pinata/upload`, verifies the caller is an investigator, uploads the file to Pinata with a server-side JWT, and returns `{ cid, gatewayUrl, size }`.
+- The UI shows a clickable `Open` link next to IPFS CID values and uses `DD/MM/YYYY HH:mm:ss` timestamps in register/verify/footer views.
 
 ## Prerequisites
 - [Node.js LTS](https://nodejs.org/) and `npm` (18+ recommended).
@@ -93,7 +94,7 @@ purple-top-bedbug-107.mypinata.cloud/Qm...
 4. Fill in:
    - optional: `VITE_EVIDENCE_REGISTRY_ADDRESS`
    - optional: `VITE_EXPECTED_CHAIN_ID=0xaa36a7`
-   - optional: `VITE_BACKEND_URL=http://localhost:3001`
+   - optional: `VITE_BACKEND_URL=http://localhost:3001` (set this if you are not using the Vite proxy route)
 
 Example:
 
@@ -173,8 +174,49 @@ Frontend:
 - `Missing script: api`
   Add `"api": "node api/index.js"` to `backend/package.json`.
 
+- `Missing required file: .../artifacts/contracts/EvidenceRegistry.sol/EvidenceRegistry.json`
+  Your Hardhat build artifacts are missing (common on fresh clone/branch switch because artifacts are git-ignored). Rebuild them:
+  ```bash
+  cd backend
+  npm ci
+  npm run compile
+  npm run api
+  ```
+  If it still fails, clean and rebuild:
+  ```bash
+  cd backend
+  rm -rf artifacts cache
+  npm run compile
+  npm run api
+  ```
+
+- `Missing required file: .../backend/artifacts/deployed.json`
+  Either run a deployment flow (`npm run deploy:all`) or set `CONTRACT_ADDRESS` in `backend/.env`.
+  The API can use `CONTRACT_ADDRESS` when `deployed.json` is not present.
+
+- `Failed to fetch` on commit/upload
+  Usually frontend cannot reach backend upload API.
+  Check:
+  - backend is running: `cd backend && npm run api`
+  - `http://localhost:3001/health` returns JSON
+  - `frontend/.env` and network mode:
+    - local Vite proxy mode: leave `VITE_BACKEND_URL` empty/commented
+    - direct backend mode: set `VITE_BACKEND_URL=http://localhost:3001`
+  - restart frontend after env changes
+
 - `Wallet is not an investigator`
-  Grant investigator access to the connected Sepolia wallet first.
+  Grant investigator access to the connected Sepolia wallet on the same contract address your app is using.
+
+- `Wallet is not an investigator` even after granting
+  Confirm there is no contract mismatch:
+  - frontend `VITE_EVIDENCE_REGISTRY_ADDRESS` (if set) must match deployed address in `frontend/src/contracts/deployed.json`
+  - backend `/health` `contractAddress` should match the same deployment
+  - connected MetaMask account is the same wallet that was granted
+
+- `no matching fragment` during contract calls
+  ABI/address mismatch. Run:
+  - `cd backend && npm run sync-artifacts`
+  - pull latest `frontend/src/contracts/evidenceRegistryAbi.json` and `frontend/src/contracts/deployed.json`
 
 - `Wrong network`
   Make sure MetaMask is on Sepolia and `EXPECTED_CHAIN_ID` is `0xaa36a7`.
@@ -182,6 +224,10 @@ Frontend:
 - `Invalid IPFS URL`
   Fix `PINATA_GATEWAY_BASE` so it looks like:
   `https://your-gateway.mypinata.cloud/ipfs/`
+  If `/ipfs/` or `https://` is missing, generated links can fail in browser.
+
+- Hardhat warning on Node 25+
+  Hardhat 2.x is most stable on Node 20 LTS. Use Node 20 for deployment/test reliability.
 
 - No CID appears
   Make sure:

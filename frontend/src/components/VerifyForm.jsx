@@ -17,8 +17,13 @@ const VerifyForm = ({ onBack }) => {
         const day = String(date.getDate()).padStart(2, '0')
         const month = String(date.getMonth() + 1).padStart(2, '0')
         const year = date.getFullYear()
-        return `${day}/${month}/${year}`
+        const hours = String(date.getHours()).padStart(2, '0')
+        const minutes = String(date.getMinutes()).padStart(2, '0')
+        const seconds = String(date.getSeconds()).padStart(2, '0')
+        return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`
     }
+
+    const buildIpfsUrl = (cid) => `https://gateway.pinata.cloud/ipfs/${cid}`
 
     const handleFileChange = (e) => {
         const selectedFile = e.target.files[0]
@@ -194,7 +199,17 @@ const VerifyForm = ({ onBack }) => {
                         <p><strong>Registrar:</strong> {evidenceData.officerName}</p>
                         <p><strong>Case ID:</strong> {evidenceData.caseId}</p>
                         {evidenceData.ipfsCid && (
-                            <p><strong>IPFS CID:</strong> {evidenceData.ipfsCid}</p>
+                            <p>
+                                <strong>IPFS CID:</strong> {evidenceData.ipfsCid}
+                                <a
+                                    className={styles.inlineLink}
+                                    href={buildIpfsUrl(evidenceData.ipfsCid)}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                >
+                                    Open
+                                </a>
+                            </p>
                         )}
                         <p><strong>Uploader:</strong> {evidenceData.uploader}</p>
                         <p><strong>Timestamp:</strong> {evidenceData.timestamp}</p>

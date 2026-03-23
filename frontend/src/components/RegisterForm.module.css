@@ -328,6 +328,17 @@
     margin-right: 1rem;
 }
 
+.inlineLink {
+    margin-left: 0.8rem;
+    color: var(--accent-blue);
+    text-decoration: underline;
+    font-family: var(--font-mono);
+}
+
+.inlineLink:hover {
+    color: var(--accent-green);
+}
+
 @keyframes fadeIn {
     from {
         opacity: 0;
