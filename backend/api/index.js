@@ -19,6 +19,7 @@ const PINATA_JWT = process.env.PINATA_JWT
 const PINATA_GATEWAY_BASE = process.env.PINATA_GATEWAY_BASE || 'https://gateway.pinata.cloud/ipfs/'
 const EXPECTED_CHAIN_ID = String(process.env.EXPECTED_CHAIN_ID || '0xaa36a7').toLowerCase()
 const RPC_URL = process.env.SEPOLIA_RPC_URL
+const CONTRACT_ADDRESS_ENV = String(process.env.CONTRACT_ADDRESS || '').trim()
 
 const deployedPath = path.join(__dirname, '..', 'artifacts', 'deployed.json')
 const artifactPath = path.join(
@@ -42,6 +43,27 @@ function loadJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf-8'))
 }
 
+function isAddress(value) {
+  return /^0x[0-9a-fA-F]{40}$/.test(String(value || '').trim())
+}
+
+function resolveDeploymentAddress() {
+  if (fs.existsSync(deployedPath)) {
+    const deployment = loadJson(deployedPath)
+    if (isAddress(deployment?.address)) {
+      return deployment.address
+    }
+  }
+
+  if (isAddress(CONTRACT_ADDRESS_ENV)) {
+    return CONTRACT_ADDRESS_ENV
+  }
+
+  throw new Error(
+    `Missing contract address. Provide ${deployedPath} or set CONTRACT_ADDRESS in backend/.env`
+  )
+}
+
 function normaliseGatewayBase(value) {
   return value.endsWith('/') ? value : `${value}/`
 }
@@ -55,10 +77,10 @@ function buildAuthMessage({ address, chainId, timestamp }) {
   ].join('\n')
 }
 
-const deployment = loadJson(deployedPath)
 const artifact = loadJson(artifactPath)
 const provider = new JsonRpcProvider(RPC_URL)
-const contract = new Contract(deployment.address, artifact.abi, provider)
+const deployedAddress = resolveDeploymentAddress()
+const contract = new Contract(deployedAddress, artifact.abi, provider)
 
 app.use(express.json())
 
@@ -159,7 +181,7 @@ app.get('/health', (_req, res) => {
   res.json({
     ok: true,
     expectedChainId: EXPECTED_CHAIN_ID,
-    contractAddress: deployment.address
+    contractAddress: deployedAddress
   })
 })
 
