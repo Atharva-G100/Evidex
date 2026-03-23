@@ -3,6 +3,7 @@ import Navbar from './components/Navbar'
 import Dashboard from './pages/Dashboard'
 import RegisterForm from './components/RegisterForm'
 import VerifyForm from './components/VerifyForm'
+import evidexLogo from './assets/evidex.svg'
 
 import SystemFooter from './components/SystemFooter'
 
@@ -49,13 +50,16 @@ function App() {
           alignItems: 'center',
           justifyContent: 'center'
         }}>
-          <div style={{
-            fontSize: '3.5rem',
-            color: 'rgba(255,255,255,0.1)',
-            letterSpacing: '1rem',
-            userSelect: 'none'
-          }}>
-            FOR
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.32 }}>
+            <img
+              src={evidexLogo}
+              alt="Evidex watermark"
+              style={{
+                width: '340px',
+                height: '340px',
+                objectFit: 'contain'
+              }}
+            />
           </div>
         </div>
       </div>

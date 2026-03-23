@@ -12,6 +12,14 @@ const VerifyForm = ({ onBack }) => {
     const [evidenceData, setEvidenceData] = useState(null)
     const [errorMsg, setErrorMsg] = useState(null)
 
+    const formatDate = (value) => {
+        const date = new Date(value)
+        const day = String(date.getDate()).padStart(2, '0')
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const year = date.getFullYear()
+        return `${day}/${month}/${year}`
+    }
+
     const handleFileChange = (e) => {
         const selectedFile = e.target.files[0]
         setFile(selectedFile)
@@ -75,10 +83,7 @@ const VerifyForm = ({ onBack }) => {
                 return
             }
 
-            const when = new Date(ts * 1000).toLocaleString('en-GB', {
-                day: '2-digit', month: 'short', year: 'numeric',
-                hour: '2-digit', minute: '2-digit'
-            })
+            const when = formatDate(ts * 1000)
 
             const custodyStatus = Number(status)
             let statusLabel = 'Analyzed'

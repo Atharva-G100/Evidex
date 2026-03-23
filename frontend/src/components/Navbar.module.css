@@ -2,7 +2,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.8rem 2rem;
+    padding: 0.45rem 2rem;
     background-color: rgba(5, 10, 20, 0.95);
     border-bottom: 1px solid var(--border-color);
     position: sticky;
@@ -13,7 +13,6 @@
 
 .logo {
     font-family: var(--font-main);
-    /* Keep main font for readability, or switch to mono */
     font-size: 1.1rem;
     font-weight: 700;
     color: var(--text-primary);
@@ -21,17 +20,17 @@
     text-transform: uppercase;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 0;
+    width: 120px;
+    overflow: visible;
 }
 
-.logo::before {
-    content: "";
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    background: linear-gradient(135deg, rgba(10, 255, 220, 0.4), rgba(47, 122, 249, 0.4));
-    box-shadow: 0 0 10px rgba(10, 255, 220, 0.4);
-    display: inline-block;
+.logoIcon {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+    transform: scale(3.4);
+    transform-origin: left center;
 }
 
 .actions {

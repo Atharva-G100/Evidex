@@ -18,6 +18,14 @@ const RegisterForm = ({ onBack }) => {
     const [txDetails, setTxDetails] = useState(null)
     const [errorMsg, setErrorMsg] = useState(null)
 
+    const formatDate = (value) => {
+        const date = new Date(value)
+        const day = String(date.getDate()).padStart(2, '0')
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const year = date.getFullYear()
+        return `${day}/${month}/${year}`
+    }
+
     const handleFileChange = (e) => {
         const selectedFile = e.target.files[0]
         setFile(selectedFile)
@@ -106,7 +114,7 @@ const RegisterForm = ({ onBack }) => {
             setTxDetails({
                 txHash: tx.hash,
                 blockNumber: receipt?.blockNumber,
-                timestamp: blockTimestampIso || new Date().toISOString()
+                timestamp: formatDate(blockTimestampIso || new Date().toISOString())
             })
             setStatus('success')
         } catch (e) {
@@ -156,10 +164,9 @@ const RegisterForm = ({ onBack }) => {
                                 <>
                                     <span className={styles.uploadIcon}>
                                         <svg viewBox="0 0 48 48" role="img" aria-label="upload">
-                                            <path d="M12 28h24a8 8 0 1 0-8-8" />
-                                            <path d="M24 34v-10" />
-                                            <path d="M20 30l4-4 4 4" />
-                                            <circle cx="28" cy="15" r="9" />
+                                            <path d="M14 34h20a7 7 0 0 0 0-14 9 9 0 0 0-17-2 6 6 0 0 0-3 16z" />
+                                            <line x1="24" y1="31" x2="24" y2="20" />
+                                            <polyline points="19,24 24,19 29,24" />
                                         </svg>
                                     </span>
                                     <span>Drag & Drop or Click to Upload</span>

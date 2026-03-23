@@ -116,6 +116,8 @@
     height: 100%;
     stroke: currentColor;
     stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
     fill: none;
     filter: drop-shadow(0 0 8px rgba(0, 255, 205, 0.7));
 }

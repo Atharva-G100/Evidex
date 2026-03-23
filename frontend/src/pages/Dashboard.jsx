@@ -5,7 +5,7 @@ const Dashboard = ({ onNavigate }) => {
   return (
       <div className={styles.dashboard}>
           <h2 className={styles.title}>Welcome back, Officer.</h2>
-          <p className={styles.subtitle}>SECURE TERMINAL ACCESS GRANTED</p>
+          <p className={styles.subtitle}>IMMUTABLE EVIDENCE REGISTRY</p>
 
             <div className={styles.cardContainer}>
                 {/* Register Card */}
