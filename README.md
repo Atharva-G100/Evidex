@@ -1,59 +1,210 @@
-# Immutable Evidence Registry — Hardhat Edition
+# Immutable Evidence Registry - Hardhat Edition
 
 ## Overview
-- Hardhat manages the Solidity compilation, tests, and deployments for `EvidenceRegistry.sol`.
-- A Vite-powered React UI hashes evidence and points to the on-chain record; the frontend now consumes the ABI/address JSON produced by Hardhat instead of manual ABI files.
-- The `backend/scripts/sync-artifacts.js` script keeps the frontend in sync with every deploy so the UI always uses the latest contract definition plus deployed address metadata.
-
+- Hardhat manages compilation, testing, and deployment for `EvidenceRegistry.sol`.
+- The React frontend hashes files locally, uploads the original file to Pinata through a protected backend API, and stores the returned CID on-chain.
+- The `backend/scripts/sync-artifacts.js` script keeps the frontend ABI and deployed address in sync with Hardhat artifacts.
+- The backend exposes `POST /pinata/upload`, verifies the caller is an investigator, uploads the file to Pinata with a server-side JWT, and returns `{ cid, gatewayUrl, size }`.
 
 ## Prerequisites
-- [Node.js LTS](https://nodejs.org/) and `npm` (>= 18 recommended).
-- MetaMask (or compatible wallet) connected to Sepolia or your chosen testnet.
-- A Sepolia RPC URL and private key for deployments (`INFURA`, `Alchemy`, etc.).
-- Pinata account (for the next phase) — the JWT is referenced in `backend/.env.example`.
+- [Node.js LTS](https://nodejs.org/) and `npm` (18+ recommended).
+- MetaMask or another compatible wallet connected to Sepolia.
+- A Sepolia RPC URL from Infura, Alchemy, QuickNode, or a similar provider.
+- A Pinata account with:
+  - an API key JWT
+  - a dedicated gateway domain
 
-## Backend setup & run steps
+## Backend Setup
 
-1. `cd backend` and `npm install` (the dependencies live inside `backend/package.json`).
-2. Copy `.env.example` to `.env` and populate:
-   - `SEPOLIA_RPC_URL` (your Sepolia endpoint from MetaMask Developer, Infura, Alchemy, or QuickNode).
-   - `PRIVATE_KEY` for the deployer account (Sepolia test ETH only) exported from MetaMask.
-   - `PINATA_JWT` + `PINATA_GATEWAY_BASE` when you wire in Pinata uploads.
-   - Optional: `CONTRACT_ADDRESS` / `INVESTIGATOR_ADDRESS` for the investigative script.
-3. `npm run compile` to regenerate the contract artifacts.
-4. `npm run test` to execute the Hardhat suite (`backend/test/EvidenceRegistry.test.js` covers registration, duplicates, CID/status, investigator access).
-5. Run `npm run deploy:all` to execute `deploy` followed by `sync-artifacts`; this publishes the contract to Sepolia and refreshes `backend/artifacts/deployed.json` plus the frontend ABI/address JSONs.
-6. Commit the synced `frontend/src/contracts/{evidenceRegistryAbi.json,deployed.json}` after shared deployments so teammates get the refreshed ABI/address without rerunning `sync-artifacts`. Skip committing these files after ephemeral local Hardhat runs.
-7. Optional: run `npx hardhat run scripts/grantInvestigator.js --network sepolia` (with `CONTRACT_ADDRESS`/`INVESTIGATOR_ADDRESS` set in `.env`) to grant/revoke investigator wallets.
+1. `cd backend`
+2. Run `npm install`
+3. Copy `.env.example` to `.env`
+4. Fill in:
+   - `SEPOLIA_RPC_URL`
+   - `PRIVATE_KEY`
+   - `PINATA_JWT`
+   - `PINATA_GATEWAY_BASE`
+   - optional: `BACKEND_PORT`
+   - optional: `EXPECTED_CHAIN_ID`
 
-## Frontend setup & run steps
+Example:
 
-1. `cd frontend` and `npm install`.
-2. Copy `.env.example` to `.env` and set (or leave blank):
-   - `VITE_EVIDENCE_REGISTRY_ADDRESS`: put the latest deployed address (`0x2BA273909e58E3f4096ABBf3604E3E0D78064ED2`) or leave it blank so the UI uses `frontend/src/contracts/deployed.json`.
-   - `VITE_EXPECTED_CHAIN_ID=0xaa36a7` to lock MetaMask to Sepolia.
-3. Start the Vite server with `npm run dev` (it auto-loads the synced ABI/address).
-4. Connect MetaMask (Sepolia, investigator wallet), upload a file to compute the SHA-256 hash, and click “Commit to Blockchain.” The UI now calls the 5-argument `registerEvidence` on Sepolia with the synchronized ABI.
+```env
+SEPOLIA_RPC_URL=https://sepolia.infura.io/v3/YOUR_PROJECT_ID
+PRIVATE_KEY=0xyourdeployerprivatekey
+PINATA_JWT=your_pinata_jwt
+PINATA_GATEWAY_BASE=https://your-gateway.mypinata.cloud/ipfs/
+BACKEND_PORT=3001
+EXPECTED_CHAIN_ID=0xaa36a7
+```
 
-### Investigator management
+Notes:
+- `BACKEND_PORT` defaults to `3001` if omitted.
+- `EXPECTED_CHAIN_ID` defaults to `0xaa36a7` if omitted.
+- `PINATA_GATEWAY_BASE` must include both `https://` and `/ipfs/`.
 
-1. The dashboard now exposes an investigator admin panel that shows the current contract address, lets you paste any Sepolia wallet to grant access, and lists all wallets that currently hold the investigator role (based on `InvestigatorUpdated` events).
-2. Keep the owner wallet connected (the wallet you used in `backend/.env`) before clicking “Grant Access.” Status feedback appears in the panel, and newly granted wallets appear immediately in the list.
-3. To audit the on-chain mapping from CLI, run `cd backend && npx hardhat run scripts/listInvestigators.js --network sepolia`—it reads the same `InvestigatorUpdated` events and prints every granted address.
-4. When you need to add another investigator without the UI, set `CONTRACT_ADDRESS` and `INVESTIGATOR_ADDRESS` in `backend/.env` and run `npx hardhat run scripts/grantInvestigator.js --network sepolia`.
+## Backend Commands
 
-## Data flow reminder
-- Files remain local; the app only hashes them and stores the hash + metadata on-chain.
-- The next phase will add Pinata pinning, report generation, and custody ledger tracking.
+1. `npm run compile`
+2. `npm run test`
+3. `npm run deploy:all`
+4. `npm run api`
 
-## Testing & verification
-- `npm run test` inside `backend` exercises `backend/test/EvidenceRegistry.test.js` (duplicate prevention, stored metadata).
-- Frontend manual verification: register evidence with a test file, verify the hash on the `Verify Evidence` screen, and confirm the contract event appears on Sepolia Etherscan.
+What these do:
+- `compile` rebuilds contract artifacts.
+- `test` runs the Hardhat test suite.
+- `deploy:all` deploys the contract and syncs ABI/address files to the frontend.
+- `api` starts the Pinata upload API at `http://localhost:3001` by default.
+
+## Pinata Setup
+
+1. Log in to Pinata.
+2. Open `API Keys`.
+3. Create a key with upload access and copy the JWT.
+4. Open `Gateways`.
+5. Copy your dedicated gateway domain.
+6. Set `PINATA_GATEWAY_BASE` like:
+
+```env
+PINATA_GATEWAY_BASE=https://purple-top-bedbug-107.mypinata.cloud/ipfs/
+```
+
+If the generated URL looks invalid, the usual problem is that the gateway base is missing:
+- `https://`
+- `/ipfs/`
+
+Correct:
+
+```txt
+https://purple-top-bedbug-107.mypinata.cloud/ipfs/Qm...
+```
+
+Incorrect:
+
+```txt
+purple-top-bedbug-107.mypinata.cloud/Qm...
+```
+
+## Frontend Setup
+
+1. `cd frontend`
+2. Run `npm install`
+3. Copy `.env.example` to `.env`
+4. Fill in:
+   - optional: `VITE_EVIDENCE_REGISTRY_ADDRESS`
+   - optional: `VITE_EXPECTED_CHAIN_ID=0xaa36a7`
+   - optional: `VITE_BACKEND_URL=http://localhost:3001`
+
+Example:
+
+```env
+VITE_EVIDENCE_REGISTRY_ADDRESS=
+VITE_EXPECTED_CHAIN_ID=0xaa36a7
+VITE_BACKEND_URL=http://localhost:3001
+```
+
+## Running The App
+
+1. Start the backend:
+
+```powershell
+cd backend
+npm run api
+```
+
+2. Start the frontend:
+
+```powershell
+cd frontend
+npm run dev
+```
+
+3. Open the frontend in your browser.
+4. Connect MetaMask on Sepolia.
+5. Use a wallet that has investigator access.
+6. Open `Register Evidence`.
+7. Select a file.
+8. Click `Generate SHA-256 Digest`.
+9. Click `Commit to Blockchain`.
+
+## Registration Flow
+
+When you register evidence:
+
+1. The frontend hashes the selected file in the browser with SHA-256.
+2. MetaMask asks you to sign an upload-auth message.
+3. The frontend sends the file plus metadata to `POST /pinata/upload`.
+4. The backend checks:
+   - request signature
+   - connected chain ID
+   - on-chain `isInvestigator(address)`
+5. If valid, the backend uploads the file to Pinata.
+6. Pinata returns a CID.
+7. The frontend calls `registerEvidence(...)` with that CID.
+8. The success box shows:
+   - `IPFS CID`
+   - `IPFS URL`
+   - transaction hash
+   - block number
+   - timestamp
+
+## Investigator Management
+
+1. The dashboard shows an investigator admin panel.
+2. Use the owner wallet to grant investigator access.
+3. Only wallets with investigator access can use the protected Pinata upload route successfully.
+
+## Testing And Verification
+
+Backend:
+- Open `http://localhost:3001/health`
+- You should receive JSON showing the backend is running.
+
+Frontend:
+- Register a test file.
+- Approve the signature prompt in MetaMask.
+- Approve the transaction prompt in MetaMask.
+- Confirm the success box shows an `IPFS CID`.
+- Open the `IPFS URL` in a browser and confirm the file resolves.
+- Verify the same file on the `Verify Evidence` screen.
 
 ## Troubleshooting
-- `Missing/invalid contract address`: ensure `VITE_EVIDENCE_REGISTRY_ADDRESS` (or `frontend/src/contracts/deployed.json`) points to a Sepolia deploy and rerun `npm run sync-artifacts`.
-- Hardhat deployment stalls: ensure your `.env` has a funded account on Sepolia and the RPC URL is correct.
-- To re-sync after a new deploy, rerun `npm run sync-artifacts` so the UI reads the latest ABI/address pair.
 
-## Next steps
-- Refer to `MiniProject.md` for the full Hardhat + Pinata + custody/reporting roadmap. Once the backend API and Pinata integration land, the frontend will POST files to Pinata, store CIDs, and surface custody reports.
+- `Missing script: api`
+  Add `"api": "node api/index.js"` to `backend/package.json`.
+
+- `Wallet is not an investigator`
+  Grant investigator access to the connected Sepolia wallet first.
+
+- `Wrong network`
+  Make sure MetaMask is on Sepolia and `EXPECTED_CHAIN_ID` is `0xaa36a7`.
+
+- `Invalid IPFS URL`
+  Fix `PINATA_GATEWAY_BASE` so it looks like:
+  `https://your-gateway.mypinata.cloud/ipfs/`
+
+- No CID appears
+  Make sure:
+  - the backend is running
+  - the frontend is using the updated register flow
+  - the signature request succeeds
+  - the backend terminal shows no Pinata errors
+
+- `PINATA_JWT is missing in backend/.env`
+  Add a valid Pinata JWT to `backend/.env`.
+
+- Pinata upload fails
+  Regenerate the JWT in Pinata and update `backend/.env`.
+
+## Current Scope
+
+This project currently supports:
+- smart contract deployment with Hardhat
+- investigator-based evidence registration
+- protected Pinata uploads through the backend
+- storing returned Pinata CIDs on-chain
+
+Planned future work includes:
+- custody ledger storage
+- report generation
+- PDF/JSON case summaries
