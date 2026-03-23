@@ -3,6 +3,7 @@ import Navbar from './components/Navbar'
 import Dashboard from './pages/Dashboard'
 import RegisterForm from './components/RegisterForm'
 import VerifyForm from './components/VerifyForm'
+import evidexLogo from './assets/evidex.svg'
 
 import SystemFooter from './components/SystemFooter'
 
@@ -32,7 +33,7 @@ function App() {
         transform: 'translate(-50%, -50%)',
         width: '600px',
         height: '600px',
-        background: 'radial-gradient(circle, rgba(255,255,255,0.03) 0%, rgba(0,0,0,0) 70%)',
+        background: 'radial-gradient(circle, rgba(255,255,255,0.04) 0%, rgba(0,0,0,0) 70%)',
         borderRadius: '50%',
         pointerEvents: 'none',
         zIndex: 0,
@@ -41,21 +42,24 @@ function App() {
         justifyContent: 'center'
       }}>
         <div style={{
-          border: '20px solid rgba(255,255,255,0.02)',
-          width: '500px',
-          height: '500px',
+          border: '18px solid rgba(255,255,255,0.03)',
+          width: '520px',
+          height: '520px',
           borderRadius: '50%',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center'
         }}>
-          <div style={{
-            fontSize: '10rem',
-            opacity: '0.05',
-            filter: 'grayscale(100%)',
-            userSelect: 'none'
-          }}>
-            🛡️
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.32 }}>
+            <img
+              src={evidexLogo}
+              alt="Evidex watermark"
+              style={{
+                width: '340px',
+                height: '340px',
+                objectFit: 'contain'
+              }}
+            />
           </div>
         </div>
       </div>

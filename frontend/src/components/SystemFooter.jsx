@@ -4,6 +4,14 @@ import styles from './SystemFooter.module.css'
 const SystemFooter = () => {
     const [time, setTime] = useState(new Date())
 
+    const formatDate = (value) => {
+        const date = new Date(value)
+        const day = String(date.getDate()).padStart(2, '0')
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const year = date.getFullYear()
+        return `${day}/${month}/${year}`
+    }
+
     useEffect(() => {
         const timer = setInterval(() => setTime(new Date()), 1000)
         return () => clearInterval(timer)
@@ -12,20 +20,8 @@ const SystemFooter = () => {
     return (
         <footer className={styles.footer}>
             <div className={styles.section}>
-                <span className={styles.label}>SYSTEM STATUS:</span>
-                <span className={styles.valuePositive}>ONLINE</span>
-            </div>
-            <div className={styles.section}>
-                <span className={styles.label}>CLEARANCE:</span>
-                <span className={styles.value}>LEVEL 5 (OFFICER)</span>
-            </div>
-            <div className={styles.section}>
-                <span className={styles.label}>IP:</span>
-                <span className={styles.value}>10.24.1.88 [SECURE]</span>
-            </div>
-            <div className={styles.section}>
-                <span className={styles.label}>ZULU:</span>
-                <span className={styles.value}>{time.toISOString().split('.')[0]}Z</span>
+                <span className={styles.label}>Timestamp:</span>
+                <span className={styles.value}>{formatDate(time)}</span>
             </div>
         </footer>
     )

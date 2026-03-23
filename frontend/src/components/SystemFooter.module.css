@@ -7,38 +7,32 @@
     border-top: 1px solid var(--border-color);
     padding: 5px 20px;
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-end;
     align-items: center;
     z-index: 200;
     font-family: var(--font-mono);
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     color: var(--text-secondary);
 }
 
 .section {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
 }
 
 .label {
     color: var(--text-secondary);
     font-weight: 700;
+    letter-spacing: 0.2rem;
 }
 
 .value {
     color: var(--accent-blue);
 }
 
-.valuePositive {
-    color: var(--accent-green);
-    text-shadow: 0 0 5px var(--accent-green);
-}
-
 @media (max-width: 768px) {
     .footer {
-        flex-wrap: wrap;
-        gap: 10px;
         justify-content: center;
     }
 }

@@ -18,6 +18,14 @@ const RegisterForm = ({ onBack }) => {
     const [txDetails, setTxDetails] = useState(null)
     const [errorMsg, setErrorMsg] = useState(null)
 
+    const formatDate = (value) => {
+        const date = new Date(value)
+        const day = String(date.getDate()).padStart(2, '0')
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const year = date.getFullYear()
+        return `${day}/${month}/${year}`
+    }
+
     const handleFileChange = (e) => {
         const selectedFile = e.target.files[0]
         setFile(selectedFile)
@@ -79,8 +87,16 @@ const RegisterForm = ({ onBack }) => {
 
             const signer = await getSigner()
             const contract = getEvidenceRegistryContract(signer)
+            const defaultStatus = 0 // CustodyStatus.COLLECTED
+            const ipfsPlaceholder = ''
 
-            const tx = await contract.registerEvidence(hash, formData.caseId.trim(), formData.officerName.trim())
+            const tx = await contract.registerEvidence(
+                hash,
+                formData.caseId.trim(),
+                formData.officerName.trim(),
+                ipfsPlaceholder,
+                defaultStatus
+            )
             const receipt = await tx.wait()
 
             let blockTimestampIso = null
@@ -98,7 +114,7 @@ const RegisterForm = ({ onBack }) => {
             setTxDetails({
                 txHash: tx.hash,
                 blockNumber: receipt?.blockNumber,
-                timestamp: blockTimestampIso || new Date().toISOString()
+                timestamp: formatDate(blockTimestampIso || new Date().toISOString())
             })
             setStatus('success')
         } catch (e) {
@@ -133,13 +149,26 @@ const RegisterForm = ({ onBack }) => {
                         <label htmlFor="fileInput" className={styles.uploadLabel}>
                             {file ? (
                                 <div className={styles.filePreview}>
-                                    <span className={styles.fileIcon}>📄</span>
+                                    <span className={styles.fileIcon}>
+                                        <svg viewBox="0 0 48 48" role="img" aria-label="file">
+                                            <rect x="12" y="6" width="24" height="36" rx="3" />
+                                            <line x1="16" y1="18" x2="32" y2="18" />
+                                            <line x1="16" y1="24" x2="32" y2="24" />
+                                            <line x1="16" y1="30" x2="26" y2="30" />
+                                        </svg>
+                                    </span>
                                     <span className={styles.fileName}>{file.name}</span>
                                     <span className={styles.fileSize}>{(file.size / 1024).toFixed(2)} KB</span>
                                 </div>
                             ) : (
                                 <>
-                                    <span className={styles.uploadIcon}>☁️</span>
+                                    <span className={styles.uploadIcon}>
+                                        <svg viewBox="0 0 48 48" role="img" aria-label="upload">
+                                            <path d="M14 34h20a7 7 0 0 0 0-14 9 9 0 0 0-17-2 6 6 0 0 0-3 16z" />
+                                            <line x1="24" y1="31" x2="24" y2="20" />
+                                            <polyline points="19,24 24,19 29,24" />
+                                        </svg>
+                                    </span>
                                     <span>Drag & Drop or Click to Upload</span>
                                 </>
                             )}
@@ -240,7 +269,15 @@ const RegisterForm = ({ onBack }) => {
             {/* Success State */}
             {status === 'success' && txDetails && (
                 <div className={styles.successBox}>
-                    <h3>✅ Evidence Secured on Blockchain</h3>
+                    <div className={styles.successHeader}>
+                        <span className={styles.successIcon}>
+                            <svg viewBox="0 0 48 48" role="img" aria-label="shield">
+                                <path d="M24 4 L36 10 L36 22 C36 30 29 36 24 40 C19 36 12 30 12 22 L12 10 Z" />
+                                <polyline points="16 22 22 28 32 18" />
+                            </svg>
+                        </span>
+                        <h3>Evidence Secured on Blockchain</h3>
+                    </div>
                     <div className={styles.txInfo}>
                         <p><strong>TX Hash:</strong> {txDetails.txHash}</p>
                         <p><strong>Block Height:</strong> {txDetails.blockNumber}</p>

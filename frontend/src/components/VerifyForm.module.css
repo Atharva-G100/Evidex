@@ -91,9 +91,27 @@
     background: rgba(10, 255, 220, 0.05);
 }
 
-.fileIcon {
-    font-size: 2.5rem;
-    filter: drop-shadow(0 0 5px var(--accent-green));
+.fileIcon,
+.uploadIcon {
+    width: 48px;
+    height: 48px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.fileIcon svg,
+.uploadIcon svg,
+.resultIcon svg {
+    width: 48px;
+    height: 48px;
+    stroke: currentColor;
+    stroke-width: 2;
+    fill: none;
+}
+
+.uploadIcon svg {
+    transform: scale(1.1);
 }
 
 .fileName {
@@ -196,7 +214,17 @@
 }
 
 .resultIcon {
-    font-size: 2rem;
+    width: 56px;
+    height: 56px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.resultIcon svg {
+    width: 40px;
+    height: 40px;
+    stroke-width: 2.5;
 }
 
 .resultBox h3 {
