@@ -3,8 +3,10 @@ import styles from './RegisterForm.module.css'
 import { useWallet } from '../hooks/useWallet'
 import { getEvidenceRegistryContract } from '../contracts/evidenceRegistry'
 
+const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || '').trim()
+
 const RegisterForm = ({ onBack }) => {
-    const { account, isCorrectNetwork, connect, provider, getSigner, error: walletError, setError: setWalletError } = useWallet()
+    const { account, chainId, isCorrectNetwork, connect, provider, getSigner, error: walletError, setError: setWalletError } = useWallet()
     const [file, setFile] = useState(null)
     const [hash, setHash] = useState('')
     const [isHashing, setIsHashing] = useState(false)
@@ -17,13 +19,59 @@ const RegisterForm = ({ onBack }) => {
     const [status, setStatus] = useState('idle') // idle, hashing, ready, registering, success
     const [txDetails, setTxDetails] = useState(null)
     const [errorMsg, setErrorMsg] = useState(null)
+    const [uploadDetails, setUploadDetails] = useState(null)
 
     const formatDate = (value) => {
         const date = new Date(value)
         const day = String(date.getDate()).padStart(2, '0')
         const month = String(date.getMonth() + 1).padStart(2, '0')
         const year = date.getFullYear()
-        return `${day}/${month}/${year}`
+        const hours = String(date.getHours()).padStart(2, '0')
+        const minutes = String(date.getMinutes()).padStart(2, '0')
+        const seconds = String(date.getSeconds()).padStart(2, '0')
+        return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`
+    }
+
+    const getApiUrl = (path) => {
+        if (!BACKEND_URL) return path
+        return `${BACKEND_URL.replace(/\/$/, '')}${path}`
+    }
+
+    const uploadToPinata = async ({ signer, selectedFile, fileHash }) => {
+        const timestamp = Date.now()
+        const normalisedAddress = account.toLowerCase()
+        const message = [
+            'Evidence Registry Pinata Upload',
+            `address:${normalisedAddress}`,
+            `chainId:${String(chainId).toLowerCase()}`,
+            `timestamp:${timestamp}`
+        ].join('\n')
+
+        const signature = await signer.signMessage(message)
+        const form = new FormData()
+        form.append('file', selectedFile)
+        form.append('caseId', formData.caseId.trim())
+        form.append('fileHash', fileHash)
+        form.append('officerName', formData.officerName.trim())
+        form.append('notes', formData.notes.trim())
+
+        const response = await fetch(getApiUrl('/pinata/upload'), {
+            method: 'POST',
+            headers: {
+                'x-wallet-address': normalisedAddress,
+                'x-wallet-signature': signature,
+                'x-chain-id': String(chainId).toLowerCase(),
+                'x-auth-timestamp': String(timestamp)
+            },
+            body: form
+        })
+
+        const payload = await response.json()
+        if (!response.ok) {
+            throw new Error(payload?.error || 'Pinata upload failed.')
+        }
+
+        return payload
     }
 
     const handleFileChange = (e) => {
@@ -33,6 +81,7 @@ const RegisterForm = ({ onBack }) => {
         setStatus('idle')
         setTxDetails(null)
         setErrorMsg(null)
+        setUploadDetails(null)
     }
 
     const generateHash = async () => {
@@ -79,6 +128,11 @@ const RegisterForm = ({ onBack }) => {
             return
         }
 
+        if (!chainId) {
+            setErrorMsg('Unable to determine connected network.')
+            return
+        }
+
         setStatus('registering')
 
         try {
@@ -86,15 +140,20 @@ const RegisterForm = ({ onBack }) => {
             setWalletError?.(null)
 
             const signer = await getSigner()
+            const uploadResult = await uploadToPinata({
+                signer,
+                selectedFile: file,
+                fileHash: hash
+            })
+            setUploadDetails(uploadResult)
             const contract = getEvidenceRegistryContract(signer)
             const defaultStatus = 0 // CustodyStatus.COLLECTED
-            const ipfsPlaceholder = ''
 
             const tx = await contract.registerEvidence(
                 hash,
                 formData.caseId.trim(),
                 formData.officerName.trim(),
-                ipfsPlaceholder,
+                uploadResult.cid,
                 defaultStatus
             )
             const receipt = await tx.wait()
@@ -279,6 +338,22 @@ const RegisterForm = ({ onBack }) => {
                         <h3>Evidence Secured on Blockchain</h3>
                     </div>
                     <div className={styles.txInfo}>
+                        {uploadDetails?.cid && (
+                            <p>
+                                <strong>IPFS CID:</strong> {uploadDetails.cid}
+                                {uploadDetails?.gatewayUrl && (
+                                    <a
+                                        className={styles.inlineLink}
+                                        href={uploadDetails.gatewayUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                    >
+                                        Open
+                                    </a>
+                                )}
+                            </p>
+                        )}
+                        {uploadDetails?.size != null && <p><strong>IPFS Size:</strong> {uploadDetails.size} bytes</p>}
                         <p><strong>TX Hash:</strong> {txDetails.txHash}</p>
                         <p><strong>Block Height:</strong> {txDetails.blockNumber}</p>
                         <p><strong>Timestamp:</strong> {txDetails.timestamp}</p>

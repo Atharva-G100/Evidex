@@ -273,6 +273,16 @@
     width: 140px;
 }
 
+.inlineLink {
+    margin-left: 0.8rem;
+    color: var(--accent-blue);
+    text-decoration: underline;
+}
+
+.inlineLink:hover {
+    color: var(--accent-green);
+}
+
 .tagSuccess {
     background: var(--accent-green);
     color: var(--bg-primary);
