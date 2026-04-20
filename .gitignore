@@ -9,6 +9,7 @@ node_modules/
 # Backend Hardhat cache
 backend/cache/
 backend/node_modules/
+backend/ledger/
 
 # Frontend build output
 frontend/node_modules/
