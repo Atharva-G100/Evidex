@@ -77,6 +77,19 @@
     z-index: 0;
 }
 
+.reportCard::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: radial-gradient(circle at top right, rgba(255, 184, 77, 0.16), transparent 72%);
+    opacity: 0.5;
+    transition: opacity 0.3s ease;
+    z-index: 0;
+}
+
 .card:hover {
     transform: translateY(-10px) scale(1.02);
     box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.7);
@@ -93,8 +106,14 @@
     border-color: var(--accent-green);
 }
 
+.reportCard:hover {
+    box-shadow: 0 0 30px rgba(255, 184, 77, 0.18);
+    border-color: #ffb84d;
+}
+
 .registerCard:hover::before,
-.verifyCard:hover::before {
+.verifyCard:hover::before,
+.reportCard:hover::before {
     opacity: 0.8;
 }
 
@@ -134,6 +153,10 @@
 
 .verifyCard .iconBadge {
     color: var(--accent-green);
+}
+
+.reportCard .iconBadge {
+    color: #ffb84d;
 }
 
 

@@ -2,8 +2,7 @@ import { useState } from 'react'
 import styles from './RegisterForm.module.css'
 import { useWallet } from '../hooks/useWallet'
 import { getEvidenceRegistryContract } from '../contracts/evidenceRegistry'
-
-const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || '').trim()
+import { buildAuthenticatedHeaders, getApiUrl, parseJsonResponse } from '../utils/backendApi'
 
 const RegisterForm = ({ onBack }) => {
     const { account, chainId, isCorrectNetwork, connect, provider, getSigner, error: walletError, setError: setWalletError } = useWallet()
@@ -32,22 +31,12 @@ const RegisterForm = ({ onBack }) => {
         return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`
     }
 
-    const getApiUrl = (path) => {
-        if (!BACKEND_URL) return path
-        return `${BACKEND_URL.replace(/\/$/, '')}${path}`
-    }
-
     const uploadToPinata = async ({ signer, selectedFile, fileHash }) => {
-        const timestamp = Date.now()
-        const normalisedAddress = account.toLowerCase()
-        const message = [
-            'Evidence Registry Pinata Upload',
-            `address:${normalisedAddress}`,
-            `chainId:${String(chainId).toLowerCase()}`,
-            `timestamp:${timestamp}`
-        ].join('\n')
-
-        const signature = await signer.signMessage(message)
+        const headers = await buildAuthenticatedHeaders({
+            account,
+            chainId,
+            signer
+        })
         const form = new FormData()
         form.append('file', selectedFile)
         form.append('caseId', formData.caseId.trim())
@@ -57,21 +46,50 @@ const RegisterForm = ({ onBack }) => {
 
         const response = await fetch(getApiUrl('/pinata/upload'), {
             method: 'POST',
-            headers: {
-                'x-wallet-address': normalisedAddress,
-                'x-wallet-signature': signature,
-                'x-chain-id': String(chainId).toLowerCase(),
-                'x-auth-timestamp': String(timestamp)
-            },
+            headers,
             body: form
         })
 
-        const payload = await response.json()
-        if (!response.ok) {
-            throw new Error(payload?.error || 'Pinata upload failed.')
-        }
+        return await parseJsonResponse(response, 'Pinata upload failed.')
+    }
 
-        return payload
+    const writeLedgerEntry = async ({
+        signer,
+        uploadResult,
+        txHash,
+        blockNumber,
+        recordedAt,
+        custodyStatus
+    }) => {
+        const headers = await buildAuthenticatedHeaders({
+            account,
+            chainId,
+            signer,
+            contentType: 'application/json'
+        })
+
+        const response = await fetch(getApiUrl('/ledger/entry'), {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+                type: 'EVIDENCE_REGISTERED',
+                caseId: formData.caseId.trim(),
+                fileHash: hash,
+                officerName: formData.officerName.trim(),
+                evidenceType: formData.evidenceType.trim(),
+                notes: formData.notes.trim(),
+                ipfsCid: uploadResult.cid,
+                gatewayUrl: uploadResult.gatewayUrl,
+                fileSize: uploadResult.size,
+                txHash,
+                blockNumber,
+                timestamp: recordedAt,
+                status: custodyStatus,
+                uploader: account
+            })
+        })
+
+        return await parseJsonResponse(response, 'Failed to write ledger entry.')
     }
 
     const handleFileChange = (e) => {
@@ -170,10 +188,26 @@ const RegisterForm = ({ onBack }) => {
                 // Non-critical.
             }
 
+            const recordedAt = blockTimestampIso || new Date().toISOString()
+            let ledgerWarning = null
+            try {
+                await writeLedgerEntry({
+                    signer,
+                    uploadResult,
+                    txHash: tx.hash,
+                    blockNumber: receipt?.blockNumber,
+                    recordedAt,
+                    custodyStatus: defaultStatus
+                })
+            } catch (error) {
+                ledgerWarning = error?.message || 'Evidence was registered on-chain, but report ledger sync failed.'
+            }
+
             setTxDetails({
                 txHash: tx.hash,
                 blockNumber: receipt?.blockNumber,
-                timestamp: formatDate(blockTimestampIso || new Date().toISOString())
+                timestamp: formatDate(recordedAt),
+                ledgerWarning
             })
             setStatus('success')
         } catch (e) {
@@ -357,6 +391,7 @@ const RegisterForm = ({ onBack }) => {
                         <p><strong>TX Hash:</strong> {txDetails.txHash}</p>
                         <p><strong>Block Height:</strong> {txDetails.blockNumber}</p>
                         <p><strong>Timestamp:</strong> {txDetails.timestamp}</p>
+                        {txDetails.ledgerWarning && <p><strong>Ledger Sync:</strong> {txDetails.ledgerWarning}</p>}
                     </div>
                 </div>
             )}

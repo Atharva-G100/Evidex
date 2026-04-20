@@ -3,6 +3,7 @@ import Navbar from './components/Navbar'
 import Dashboard from './pages/Dashboard'
 import RegisterForm from './components/RegisterForm'
 import VerifyForm from './components/VerifyForm'
+import ReportForm from './components/ReportForm'
 import evidexLogo from './assets/evidex.svg'
 
 import SystemFooter from './components/SystemFooter'
@@ -16,6 +17,8 @@ function App() {
         return <RegisterForm onBack={() => setCurrentView('home')} />
       case 'verify':
         return <VerifyForm onBack={() => setCurrentView('home')} />
+      case 'report':
+        return <ReportForm onBack={() => setCurrentView('home')} />
       default:
         return <Dashboard onNavigate={setCurrentView} />
     }

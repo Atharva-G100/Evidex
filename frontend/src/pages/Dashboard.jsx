@@ -43,6 +43,24 @@ const Dashboard = ({ onNavigate }) => {
                     <h3>VERIFY INTEGRITY</h3>
                     <p>Cross-reference file hashes against the blockchain to detect tampering.</p>
                 </div>
+
+                <div
+                    className={`${styles.card} ${styles.reportCard}`}
+                    onClick={() => onNavigate('report')}
+                >
+                    <div className={styles.cornerTopLeft}></div>
+                    <div className={styles.cornerBottomRight}></div>
+
+                    <div className={styles.iconBadge}>
+                        <svg viewBox="0 0 48 48" aria-hidden="true">
+                            <path d="M14 8h16l8 8v24H14z" />
+                            <path d="M30 8v10h8" strokeWidth="2" />
+                            <path d="M20 24h12M20 30h12M20 36h8" strokeWidth="2" />
+                        </svg>
+                    </div>
+                    <h3>CASE REPORTS</h3>
+                    <p>Generate case summaries from the custody ledger and active blockchain state.</p>
+                </div>
         </div>
 
         <InvestigatorPanel />
