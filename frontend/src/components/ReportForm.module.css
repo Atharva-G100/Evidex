@@ -163,6 +163,7 @@
 }
 
 .summaryGrid p,
+.contributorCard p,
 .evidenceCard p,
 .timelineBody p {
   margin: 0;
@@ -173,6 +174,7 @@
 }
 
 .summaryGrid strong,
+.contributorCard strong,
 .evidenceCard strong,
 .timelineBody strong {
   color: var(--text-secondary);
@@ -193,6 +195,21 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 1rem;
+}
+
+.contributorGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.contributorCard {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.18);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
 }
 
 .evidenceCard {

@@ -279,6 +279,9 @@ const RegisterForm = ({ onBack }) => {
                             value={formData.caseId}
                             onChange={e => setFormData({ ...formData, caseId: e.target.value })}
                         />
+                        <small style={{ display: 'block', marginTop: '0.45rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+                            Reuse an existing Case ID to append evidence from another authorized investigator.
+                        </small>
                     </div>
 
                     <div className={styles.formGroup}>

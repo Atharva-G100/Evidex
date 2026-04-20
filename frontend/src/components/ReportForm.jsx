@@ -94,6 +94,7 @@ const ReportForm = ({ onBack }) => {
       <h2 className={styles.heading}>Generate Case Report</h2>
       <p className={styles.subtitle}>
         Generate a pinned JSON report from the local custody ledger and the live on-chain registry.
+        Multiple investigators can contribute evidence under the same case ID and it will appear here.
       </p>
 
       <div className={styles.panel}>
@@ -150,6 +151,7 @@ const ReportForm = ({ onBack }) => {
               <p><strong>Network:</strong> {String(reportData.network || '').toUpperCase()}</p>
               <p><strong>Evidence Count:</strong> {reportData.evidenceCount}</p>
               <p><strong>Ledger Entries:</strong> {reportData.ledgerEntryCount}</p>
+              <p><strong>Contributors:</strong> {reportData.contributorCount || reportData.contributors?.length || 0}</p>
               <p>
                 <strong>Report CID:</strong> {reportData.reportCid}
                 {reportData.reportGatewayUrl && (
@@ -168,6 +170,24 @@ const ReportForm = ({ onBack }) => {
 
           <div className={styles.section}>
             <div className={styles.sectionHeader}>
+              <h3>Investigators</h3>
+              <span>{reportData.contributors?.length || 0} active contributors</span>
+            </div>
+
+            <div className={styles.contributorGrid}>
+              {(reportData.contributors || []).map((item) => (
+                <article key={item.wallet} className={styles.contributorCard}>
+                  <p><strong>Wallet:</strong> {item.wallet}</p>
+                  <p><strong>Evidence Added:</strong> {item.evidenceCount}</p>
+                  <p><strong>Latest Activity:</strong> {formatDate(item.latestActivityAt)}</p>
+                  <p><strong>Officer Names:</strong> {item.officerNames?.length ? item.officerNames.join(', ') : 'Unavailable'}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+
+          <div className={styles.section}>
+            <div className={styles.sectionHeader}>
               <h3>Evidence Summary</h3>
               <span>{reportData.evidence?.length || 0} records</span>
             </div>
@@ -177,6 +197,7 @@ const ReportForm = ({ onBack }) => {
                 <article key={item.fileHash} className={styles.evidenceCard}>
                   <p><strong>File Hash:</strong> {item.fileHash}</p>
                   <p><strong>Officer:</strong> {item.officerName || 'Unavailable'}</p>
+                  <p><strong>Investigator:</strong> {item.investigator || 'Unavailable'}</p>
                   <p><strong>Status:</strong> {item.custodyStatusLabel}</p>
                   <p><strong>Registered:</strong> {formatDate(item.registeredAt)}</p>
                   {item.ipfsCid && (
