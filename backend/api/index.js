@@ -480,8 +480,34 @@ app.post('/reports/:caseId', verifyInvestigator, async (req, res, next) => {
       (entry) => entry.type === 'EVIDENCE_REGISTERED' && entry.fileHash
     )
     const uniqueFileHashes = [...new Set(registrationEntries.map((entry) => entry.fileHash))]
+    const contributorMap = new Map()
     const evidence = []
     let chainReadFailures = 0
+
+    for (const entry of registrationEntries) {
+      const wallet = String(entry.investigator || entry.uploader || '').trim().toLowerCase()
+      if (!wallet) continue
+
+      const current = contributorMap.get(wallet) || {
+        wallet,
+        officerNames: new Set(),
+        evidenceCount: 0,
+        latestActivityAt: null
+      }
+
+      if (entry.officerName) {
+        current.officerNames.add(entry.officerName)
+      }
+
+      current.evidenceCount += 1
+
+      const timestamp = normaliseIsoTimestamp(entry.timestamp || entry.createdAt)
+      if (!current.latestActivityAt || timestamp > current.latestActivityAt) {
+        current.latestActivityAt = timestamp
+      }
+
+      contributorMap.set(wallet, current)
+    }
 
     for (const fileHash of uniqueFileHashes) {
       const registration = registrationEntries.find((entry) => entry.fileHash === fileHash)
@@ -506,6 +532,7 @@ app.post('/reports/:caseId', verifyInvestigator, async (req, res, next) => {
         officerName: onChain?.officerName || registration?.officerName || '',
         ipfsCid: resolvedCid,
         ipfsGatewayUrl: resolvedCid ? buildGatewayUrl(resolvedCid) : registration?.gatewayUrl || '',
+        investigator: registration?.investigator || registration?.uploader || '',
         uploader: onChain?.uploader || registration?.uploader || '',
         registeredAt: onChain?.timestamp || registration?.timestamp || null,
         custodyStatusCode: resolvedStatusCode,
@@ -519,6 +546,15 @@ app.post('/reports/:caseId', verifyInvestigator, async (req, res, next) => {
       })
     }
 
+    const contributors = [...contributorMap.values()]
+      .map((entry) => ({
+        wallet: entry.wallet,
+        officerNames: [...entry.officerNames],
+        evidenceCount: entry.evidenceCount,
+        latestActivityAt: entry.latestActivityAt
+      }))
+      .sort((left, right) => right.evidenceCount - left.evidenceCount)
+
     const generatedAt = new Date().toISOString()
     const reportContent = {
       reportVersion: 1,
@@ -531,8 +567,10 @@ app.post('/reports/:caseId', verifyInvestigator, async (req, res, next) => {
         evidenceCount: evidence.length,
         ledgerEntryCount: ledger.entries.length,
         latestLedgerUpdate: ledger.updatedAt,
+        contributorCount: contributors.length,
         chainReadFailures
       },
+      contributors,
       evidence,
       ledgerEntries: ledger.entries
     }
@@ -583,7 +621,9 @@ app.post('/reports/:caseId', verifyInvestigator, async (req, res, next) => {
       reportSize: reportRecord.size,
       evidenceCount: evidence.length,
       ledgerEntryCount: ledger.entries.length,
+      contributorCount: contributors.length,
       chainReadFailures,
+      contributors,
       evidence,
       ledgerEntries: ledger.entries
     })
