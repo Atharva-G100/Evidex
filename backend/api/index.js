@@ -229,67 +229,54 @@ async function getChainCaseRegistrations(caseId) {
   )
 
   const registrations = []
-  const txCache = new Map()
+  const evidenceCache = new Map()
 
   for (const log of logs) {
     const fileHash = String(log.args?.fileHash ?? log.args?.[0] ?? '').trim()
     if (!fileHash) continue
 
-    const txHash = String(log.transactionHash || '').trim()
-    let parsed = txCache.get(txHash)
-
-    if (!parsed) {
-      const tx = await withRpcRetry(
-        () => provider.getTransaction(txHash),
-        'Registration transaction read',
-        2
-      )
-
-      if (!tx) continue
-
+    let evidence = evidenceCache.get(fileHash)
+    if (!evidence) {
       try {
-        const description = contract.interface.parseTransaction({
-          data: tx.data,
-          value: tx.value
-        })
+        const [chainCaseId, officerName, ipfsCid, uploader, timestamp, status] = await withRpcRetry(
+          () => contract.getEvidence(fileHash),
+          'Evidence read',
+          2
+        )
 
-        if (description?.name !== 'registerEvidence') {
-          continue
+        evidence = {
+          caseId: String(chainCaseId || '').trim(),
+          officerName: String(officerName || '').trim(),
+          ipfsCid: String(ipfsCid || '').trim(),
+          uploader: String(uploader || '').trim().toLowerCase(),
+          rawTimestamp: Number(timestamp || 0),
+          statusCode: Number(status || 0)
         }
-
-        parsed = {
-          caseId: String(description.args?.[1] ?? '').trim(),
-          officerName: String(description.args?.[2] ?? '').trim()
-        }
+        evidenceCache.set(fileHash, evidence)
       } catch {
         continue
       }
-
-      txCache.set(txHash, parsed)
     }
 
-    if (parsed.caseId !== caseId) {
+    if (evidence.caseId !== caseId) {
       continue
     }
 
-    const statusCode = Number(log.args?.status ?? log.args?.[4] ?? 0)
-    const rawTimestamp = Number(log.args?.timestamp ?? log.args?.[2] ?? 0)
-    const ipfsCid = String(log.args?.ipfsCid ?? log.args?.[3] ?? '').trim()
-    const uploader = String(log.args?.uploader ?? log.args?.[1] ?? '').trim().toLowerCase()
+    const txHash = String(log.transactionHash || '').trim()
 
     registrations.push({
       source: 'chain',
       fileHash,
-      caseId: parsed.caseId,
-      officerName: parsed.officerName,
-      ipfsCid,
-      ipfsGatewayUrl: ipfsCid ? buildGatewayUrl(ipfsCid) : '',
-      uploader,
-      investigator: uploader,
-      timestamp: rawTimestamp ? new Date(rawTimestamp * 1000).toISOString() : null,
-      rawTimestamp,
-      statusCode,
-      statusLabel: getStatusLabel(statusCode),
+      caseId: evidence.caseId,
+      officerName: evidence.officerName,
+      ipfsCid: evidence.ipfsCid,
+      ipfsGatewayUrl: evidence.ipfsCid ? buildGatewayUrl(evidence.ipfsCid) : '',
+      uploader: evidence.uploader,
+      investigator: evidence.uploader,
+      timestamp: evidence.rawTimestamp ? new Date(evidence.rawTimestamp * 1000).toISOString() : null,
+      rawTimestamp: evidence.rawTimestamp,
+      statusCode: evidence.statusCode,
+      statusLabel: getStatusLabel(evidence.statusCode),
       txHash,
       blockNumber: log.blockNumber ?? null
     })
