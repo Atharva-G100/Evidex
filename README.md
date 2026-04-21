@@ -1,283 +1,441 @@
-# Immutable Evidence Registry - Hardhat Edition
+# Immutable Evidence Registry
 
 ## Overview
-- Hardhat manages compilation, testing, and deployment for `EvidenceRegistry.sol`.
-- The React frontend hashes files locally, uploads the original file to Pinata through a protected backend API, and stores the returned CID on-chain.
-- The `backend/scripts/sync-artifacts.js` script keeps the frontend ABI and deployed address in sync with Hardhat artifacts.
-- The backend exposes `POST /pinata/upload`, verifies the caller is an investigator, uploads the file to Pinata with a server-side JWT, and returns `{ cid, gatewayUrl, size }`.
-- The backend persists per-case ledger files in `backend/ledger/`, accepts `POST /ledger/entry`, and can generate/pin JSON case reports through `POST /reports/:caseId`.
-- The UI shows a clickable `Open` link next to IPFS CID values and uses `DD/MM/YYYY HH:mm:ss` timestamps in register/verify/footer views.
+This project is a forensic evidence management system built around an Ethereum smart contract, a protected backend API, and a React-based investigator dashboard. Its primary purpose is to register digital evidence immutably on-chain, preserve case-level traceability, and generate structured reports for evidentiary review.
+
+The system is divided into three major layers:
+
+1. Smart contract layer
+   - [EvidenceRegistry.sol](/home/shubh/Project/Forensics-BT-mini-proj/backend/contracts/EvidenceRegistry.sol)
+   - Stores evidence records by file hash
+   - Stores `caseId`, officer name, IPFS CID, uploader, timestamp, and custody status
+   - Enforces investigator-only registration and custody updates
+
+2. Backend service layer
+   - [api/index.js](/home/shubh/Project/Forensics-BT-mini-proj/backend/api/index.js)
+   - Verifies investigator access using signed wallet requests plus on-chain role checks
+   - Uploads files and generated reports to Pinata
+   - Persists case-level ledger files in `backend/ledger/`
+   - Builds merged case reports from local ledger data and shared on-chain registrations
+   - Exposes PDF export for case reports
+
+3. Frontend interface layer
+   - [App.jsx](/home/shubh/Project/Forensics-BT-mini-proj/frontend/src/App.jsx)
+   - [Dashboard.jsx](/home/shubh/Project/Forensics-BT-mini-proj/frontend/src/pages/Dashboard.jsx)
+   - [RegisterForm.jsx](/home/shubh/Project/Forensics-BT-mini-proj/frontend/src/components/RegisterForm.jsx)
+   - [VerifyForm.jsx](/home/shubh/Project/Forensics-BT-mini-proj/frontend/src/components/VerifyForm.jsx)
+   - [ReportForm.jsx](/home/shubh/Project/Forensics-BT-mini-proj/frontend/src/components/ReportForm.jsx)
+   - Provides investigator workflows for evidence registration, verification, investigator management, JSON report generation, and PDF download
+
+The artifact sync layer connects Hardhat output to the frontend:
+- [deploy.js](/home/shubh/Project/Forensics-BT-mini-proj/backend/scripts/deploy.js)
+- [sync-artifacts.js](/home/shubh/Project/Forensics-BT-mini-proj/backend/scripts/sync-artifacts.js)
+- [evidenceRegistryAbi.json](/home/shubh/Project/Forensics-BT-mini-proj/frontend/src/contracts/evidenceRegistryAbi.json)
+- [deployed.json](/home/shubh/Project/Forensics-BT-mini-proj/frontend/src/contracts/deployed.json)
 
 ## Prerequisites
-- [Node.js LTS](https://nodejs.org/) and `npm` (18+ recommended).
-- MetaMask or another compatible wallet connected to Sepolia.
-- A Sepolia RPC URL from Infura, Alchemy, QuickNode, or a similar provider.
-- A Pinata account with:
-  - an API key JWT
-  - a dedicated gateway domain
+The following software and accounts are required before installation:
+
+1. Node.js
+   - Node.js LTS is recommended
+   - Hardhat 2.x is most stable on Node 20 LTS
+
+2. npm
+   - Included with Node.js
+
+3. MetaMask
+   - Required for wallet connection and investigator signing
+   - Must be configured for the Sepolia test network
+
+4. Sepolia RPC provider
+   - Infura, MetaMask Developer, Alchemy, QuickNode, or equivalent
+   - Required by the backend for contract reads and verification
+
+5. Pinata account
+   - Required for file upload and report storage
+   - You need:
+     - a valid Pinata JWT
+     - a valid gateway base URL ending in `/ipfs/`
 
 ## Backend Setup
+The backend compiles and serves the contract artifacts, verifies investigator access, uploads evidence to IPFS via Pinata, stores case ledgers, and generates reports.
 
-1. `cd backend`
-2. Run `npm install`
-3. Copy `.env.example` to `.env`
-4. Fill in:
-   - `SEPOLIA_RPC_URL`
-   - `PRIVATE_KEY`
-   - `PINATA_JWT`
-   - `PINATA_GATEWAY_BASE`
-   - optional: `BACKEND_PORT`
-   - optional: `EXPECTED_CHAIN_ID`
-   - optional: `LEDGER_DIR`
-   - optional: `NETWORK_NAME`
+### Step 1: Enter the backend directory
+```bash
+cd /home/shubh/Project/Forensics-BT-mini-proj/backend
+```
+
+### Step 2: Install dependencies
+```bash
+npm install
+```
+
+This installs:
+- Hardhat
+- ethers
+- dotenv
+- express
+- multer
+- pdfkit
+
+### Step 3: Create the environment file
+```bash
+cp .env.example .env
+```
+
+### Step 4: Configure backend environment variables
+Edit `backend/.env` and provide values for the following:
+
+Required:
+- `SEPOLIA_RPC_URL`
+- `PRIVATE_KEY`
+- `PINATA_JWT`
+- `PINATA_GATEWAY_BASE`
+
+Optional:
+- `CONTRACT_ADDRESS`
+- `BACKEND_PORT`
+- `EXPECTED_CHAIN_ID`
+- `LEDGER_DIR`
+- `NETWORK_NAME`
+- `RPC_TIMEOUT_MS`
+- `INVESTIGATOR_CACHE_TTL_MS`
 
 Example:
-
 ```env
 SEPOLIA_RPC_URL=https://sepolia.infura.io/v3/YOUR_PROJECT_ID
 PRIVATE_KEY=0xyourdeployerprivatekey
 PINATA_JWT=your_pinata_jwt
 PINATA_GATEWAY_BASE=https://your-gateway.mypinata.cloud/ipfs/
+CONTRACT_ADDRESS=0xYourDeployedContractAddress
 BACKEND_PORT=3001
 EXPECTED_CHAIN_ID=0xaa36a7
 LEDGER_DIR=ledger
 NETWORK_NAME=sepolia
+RPC_TIMEOUT_MS=30000
+INVESTIGATOR_CACHE_TTL_MS=600000
 ```
 
-Notes:
-- `BACKEND_PORT` defaults to `3001` if omitted.
-- `EXPECTED_CHAIN_ID` defaults to `0xaa36a7` if omitted.
-- `PINATA_GATEWAY_BASE` must include both `https://` and `/ipfs/`.
-
-## Backend Commands
-
-1. `npm run compile`
-2. `npm run test`
-3. `npm run deploy:all`
-4. `npm run api`
-
-What these do:
-- `compile` rebuilds contract artifacts.
-- `test` runs the Hardhat test suite.
-- `deploy:all` deploys the contract and syncs ABI/address files to the frontend.
-- `api` starts the Pinata upload API at `http://localhost:3001` by default.
-- `api` also serves ledger persistence and case report generation.
-
-## Pinata Setup
-
-1. Log in to Pinata.
-2. Open `API Keys`.
-3. Create a key with upload access and copy the JWT.
-4. Open `Gateways`.
-5. Copy your dedicated gateway domain.
-6. Set `PINATA_GATEWAY_BASE` like:
-
-```env
-PINATA_GATEWAY_BASE=https://purple-top-bedbug-107.mypinata.cloud/ipfs/
+### Step 5: Compile the contract
+```bash
+npm run compile
 ```
 
-If the generated URL looks invalid, the usual problem is that the gateway base is missing:
-- `https://`
-- `/ipfs/`
+### Step 6: Run backend tests
+```bash
+npm test
+```
 
-Correct:
+### Step 7: Deploy and sync artifacts if needed
+Use this when deploying a new contract or refreshing ABI and address metadata:
+```bash
+npm run deploy:all
+```
 
+### Step 8: Start the backend API
+```bash
+npm run api
+```
+
+The backend will serve:
+- `GET /health`
+- `POST /pinata/upload`
+- `POST /ledger/entry`
+- `POST /reports/:caseId`
+- `POST /reports/:caseId/pdf`
+
+## Backend Troubleshooting
+Common backend issues and corresponding fixes are listed below.
+
+### 1. `Missing required file: .../artifacts/contracts/EvidenceRegistry.sol/EvidenceRegistry.json`
+Cause:
+- Hardhat artifacts are missing after a fresh clone, branch switch, or cleanup
+
+Fix:
+```bash
+cd /home/shubh/Project/Forensics-BT-mini-proj/backend
+npm install
+npm run compile
+```
+
+If the issue persists:
+```bash
+rm -rf artifacts cache
+npm run compile
+```
+
+### 2. `Missing required file: .../backend/artifacts/deployed.json`
+Cause:
+- Deployment metadata is missing
+
+Fix:
+- either run:
+```bash
+npm run deploy:all
+```
+- or set `CONTRACT_ADDRESS` in `backend/.env`
+
+### 3. `Wallet is not an investigator`
+Cause:
+- the connected wallet is not granted investigator access on the active contract
+
+Fix:
+- confirm the connected MetaMask account
+- confirm backend `/health` returns the intended contract address
+- grant the investigator role on that exact contract
+
+### 4. `Evidence read request timed out`
+Cause:
+- Sepolia RPC is slow or unstable
+
+Fix:
+- verify `SEPOLIA_RPC_URL`
+- increase `RPC_TIMEOUT_MS` in `backend/.env`
+- restart backend
+
+### 5. `PINATA_JWT is missing in backend/.env`
+Fix:
+- add a valid Pinata JWT and restart backend
+
+### 6. Invalid IPFS gateway URLs
+Cause:
+- gateway base is malformed
+
+Correct format:
 ```txt
-https://purple-top-bedbug-107.mypinata.cloud/ipfs/Qm...
+https://your-gateway.mypinata.cloud/ipfs/
 ```
 
-Incorrect:
-
+Incorrect format:
 ```txt
-purple-top-bedbug-107.mypinata.cloud/Qm...
+your-gateway.mypinata.cloud/Qm...
 ```
+
+### 7. Reports differ across teammates
+Cause:
+- different contract addresses are being used on different machines
+
+Fix:
+- compare `http://localhost:3001/health` on both machines
+- ensure `contractAddress` matches
+- ensure frontend and backend both target the same contract deployment
 
 ## Frontend Setup
+The frontend provides the investigator dashboard, evidence registration workflow, verification workflow, and reporting interface.
 
-1. `cd frontend`
-2. Run `npm install`
-3. Copy `.env.example` to `.env`
-4. Fill in:
-   - optional: `VITE_EVIDENCE_REGISTRY_ADDRESS`
-   - optional: `VITE_EXPECTED_CHAIN_ID=0xaa36a7`
-   - optional: `VITE_BACKEND_URL=http://localhost:3001` (set this if you are not using the Vite proxy route)
+### Step 1: Enter the frontend directory
+```bash
+cd /home/shubh/Project/Forensics-BT-mini-proj/frontend
+```
 
-Example:
+### Step 2: Install dependencies
+```bash
+npm install
+```
 
+### Step 3: Create the environment file
+```bash
+cp .env.example .env
+```
+
+### Step 4: Configure frontend environment variables
+Edit `frontend/.env` and provide values as needed.
+
+Available variables:
+- `VITE_EVIDENCE_REGISTRY_ADDRESS`
+- `VITE_EXPECTED_CHAIN_ID`
+- `VITE_BACKEND_URL`
+
+Recommended local development configuration:
 ```env
 VITE_EVIDENCE_REGISTRY_ADDRESS=
 VITE_EXPECTED_CHAIN_ID=0xaa36a7
 VITE_BACKEND_URL=http://localhost:3001
 ```
 
-## Running The App
+Notes:
+- If `VITE_EVIDENCE_REGISTRY_ADDRESS` is left empty, the frontend falls back to synced deployment metadata
+- If you use the Vite proxy route, `VITE_BACKEND_URL` may be left unset
+- If you explicitly set `VITE_EVIDENCE_REGISTRY_ADDRESS`, it must match the active backend contract
 
-1. Start the backend:
-
-```powershell
-cd backend
-npm run api
-```
-
-2. Start the frontend:
-
-```powershell
-cd frontend
+### Step 5: Start the frontend
+```bash
 npm run dev
 ```
 
-3. Open the frontend in your browser.
-4. Connect MetaMask on Sepolia.
-5. Use a wallet that has investigator access.
-6. Open `Register Evidence`.
-7. Select a file.
-8. Click `Generate SHA-256 Digest`.
-9. Click `Commit to Blockchain`.
+### Step 6: Optional production build validation
+```bash
+npm run build
+```
 
-## Registration Flow
+## Frontend Troubleshooting
+### 1. `Failed to fetch`
+Cause:
+- frontend cannot reach backend API
 
-When you register evidence:
+Fix:
+- confirm backend is running
+- open `http://localhost:3001/health`
+- confirm `VITE_BACKEND_URL`
+- restart frontend after changing `.env`
 
-1. The frontend hashes the selected file in the browser with SHA-256.
-2. MetaMask asks you to sign an upload-auth message.
-3. The frontend sends the file plus metadata to `POST /pinata/upload`.
-4. The backend checks:
-   - request signature
-   - connected chain ID
-   - on-chain `isInvestigator(address)`
-5. If valid, the backend uploads the file to Pinata.
-6. Pinata returns a CID.
-7. The frontend calls `registerEvidence(...)` with that CID.
-8. The success box shows:
-   - `IPFS CID`
-   - `IPFS URL`
-   - transaction hash
-   - block number
-   - timestamp
-9. After the transaction is mined, the frontend posts a matching custody ledger entry to the backend for later report generation.
+### 2. `no matching fragment`
+Cause:
+- ABI and deployed address are out of sync
 
-## Reporting Flow
+Fix:
+```bash
+cd /home/shubh/Project/Forensics-BT-mini-proj/backend
+npm run sync-artifacts
+```
 
-1. Open `Case Reports` from the dashboard.
-2. Enter a case ID that already has registered evidence.
-3. Approve the MetaMask signature prompt.
-4. The backend reads `backend/ledger/<caseId>.json`, cross-checks each evidence hash on-chain, assembles a JSON report, and pins it to Pinata.
-5. The frontend shows:
-   - report CID with `Open` link
-   - case summary
+### 3. Wrong contract visible between teammates
+Fix:
+- compare frontend and backend contract addresses
+- ensure:
+  - `frontend/src/contracts/deployed.json`
+  - `backend/.env`
+  - `backend/artifacts/deployed.json`
+  - `frontend/.env`
+  all refer to the same deployment
+
+### 4. Wrong network
+Fix:
+- switch MetaMask to Sepolia
+- confirm `VITE_EXPECTED_CHAIN_ID=0xaa36a7`
+
+## Running the Application
+The standard execution sequence is:
+
+### 1. Start the backend
+```bash
+cd /home/shubh/Project/Forensics-BT-mini-proj/backend
+npm run api
+```
+
+### 2. Start the frontend
+```bash
+cd /home/shubh/Project/Forensics-BT-mini-proj/frontend
+npm run dev
+```
+
+### 3. Confirm backend health
+Open:
+```txt
+http://localhost:3001/health
+```
+
+Expected:
+- `ok: true`
+- correct `expectedChainId`
+- correct `contractAddress`
+
+### 4. Open the frontend
+By default, Vite serves on:
+```txt
+http://localhost:5173
+```
+
+### 5. Connect MetaMask
+- use Sepolia
+- use an investigator wallet for registration and reporting
+
+## Operational Workflows
+### 1. Register Evidence
+The registration flow is handled primarily by:
+- [RegisterForm.jsx](/home/shubh/Project/Forensics-BT-mini-proj/frontend/src/components/RegisterForm.jsx)
+- [api/index.js](/home/shubh/Project/Forensics-BT-mini-proj/backend/api/index.js)
+
+Process:
+1. Select a file
+2. Generate a SHA-256 digest in the browser
+3. Sign the backend authorization message in MetaMask
+4. Upload the file to Pinata through `/pinata/upload`
+5. Submit the CID to the smart contract
+6. Write a matching case ledger entry to `/ledger/entry`
+
+Outcome:
+- evidence is stored on-chain by hash
+- file is stored in IPFS via Pinata
+- case history is persisted in the backend ledger
+
+### 2. Verify Evidence
+The verification flow is handled by:
+- [VerifyForm.jsx](/home/shubh/Project/Forensics-BT-mini-proj/frontend/src/components/VerifyForm.jsx)
+
+Process:
+1. Select a file
+2. Generate a SHA-256 digest
+3. Query the contract for the matching evidence record
+
+Outcome:
+- integrity status
+- case metadata
+- IPFS CID
+- uploader
+- timestamp
+- custody status
+
+### 3. Investigator Management
+Handled by:
+- [InvestigatorPanel.jsx](/home/shubh/Project/Forensics-BT-mini-proj/frontend/src/components/InvestigatorPanel.jsx)
+
+Capabilities:
+- display active contract address
+- grant investigator permissions by wallet address
+- list wallets with investigator permissions
+
+### 4. Case Reporting
+Handled by:
+- [ReportForm.jsx](/home/shubh/Project/Forensics-BT-mini-proj/frontend/src/components/ReportForm.jsx)
+- [api/index.js](/home/shubh/Project/Forensics-BT-mini-proj/backend/api/index.js)
+
+Process:
+1. Enter a case ID
+2. Sign the report request
+3. Backend builds a merged case report from:
+   - shared on-chain evidence registrations
+   - local ledger entries and case notes
+4. Backend pins the JSON report to Pinata
+5. Frontend displays:
+   - contributors
    - evidence list
-   - ledger-backed timeline
+   - timeline
+   - report CID
+6. User may download the PDF report through `/reports/:caseId/pdf`
 
-## Investigator Management
+Important:
+- multiple investigators may register evidence using the same `caseId`
+- if they are using the same contract deployment, the report should show shared evidence from all investigators
 
-1. The dashboard shows an investigator admin panel.
-2. Use the owner wallet to grant investigator access.
-3. Only wallets with investigator access can use the protected Pinata upload route successfully.
-
-## Testing And Verification
-
+## Summary of Important Files
 Backend:
-- Open `http://localhost:3001/health`
-- You should receive JSON showing the backend is running.
+- [backend/contracts/EvidenceRegistry.sol](/home/shubh/Project/Forensics-BT-mini-proj/backend/contracts/EvidenceRegistry.sol)
+- [backend/api/index.js](/home/shubh/Project/Forensics-BT-mini-proj/backend/api/index.js)
+- [backend/scripts/deploy.js](/home/shubh/Project/Forensics-BT-mini-proj/backend/scripts/deploy.js)
+- [backend/scripts/sync-artifacts.js](/home/shubh/Project/Forensics-BT-mini-proj/backend/scripts/sync-artifacts.js)
+- [backend/test/EvidenceRegistry.test.js](/home/shubh/Project/Forensics-BT-mini-proj/backend/test/EvidenceRegistry.test.js)
 
 Frontend:
-- Register a test file.
-- Approve the signature prompt in MetaMask.
-- Approve the transaction prompt in MetaMask.
-- Confirm the success box shows an `IPFS CID`.
-- Open the `IPFS URL` in a browser and confirm the file resolves.
-- Verify the same file on the `Verify Evidence` screen.
-- Generate a case report and confirm the `Report CID` opens from Pinata.
+- [frontend/src/App.jsx](/home/shubh/Project/Forensics-BT-mini-proj/frontend/src/App.jsx)
+- [frontend/src/pages/Dashboard.jsx](/home/shubh/Project/Forensics-BT-mini-proj/frontend/src/pages/Dashboard.jsx)
+- [frontend/src/components/RegisterForm.jsx](/home/shubh/Project/Forensics-BT-mini-proj/frontend/src/components/RegisterForm.jsx)
+- [frontend/src/components/VerifyForm.jsx](/home/shubh/Project/Forensics-BT-mini-proj/frontend/src/components/VerifyForm.jsx)
+- [frontend/src/components/ReportForm.jsx](/home/shubh/Project/Forensics-BT-mini-proj/frontend/src/components/ReportForm.jsx)
+- [frontend/src/components/InvestigatorPanel.jsx](/home/shubh/Project/Forensics-BT-mini-proj/frontend/src/components/InvestigatorPanel.jsx)
+- [frontend/src/contracts/evidenceRegistry.js](/home/shubh/Project/Forensics-BT-mini-proj/frontend/src/contracts/evidenceRegistry.js)
 
-## Troubleshooting
-
-- `Missing script: api`
-  Add `"api": "node api/index.js"` to `backend/package.json`.
-
-- `Missing required file: .../artifacts/contracts/EvidenceRegistry.sol/EvidenceRegistry.json`
-  Your Hardhat build artifacts are missing (common on fresh clone/branch switch because artifacts are git-ignored). Rebuild them:
-  ```bash
-  cd backend
-  npm ci
-  npm run compile
-  npm run api
-  ```
-  If it still fails, clean and rebuild:
-  ```bash
-  cd backend
-  rm -rf artifacts cache
-  npm run compile
-  npm run api
-  ```
-
-- `Missing required file: .../backend/artifacts/deployed.json`
-  Either run a deployment flow (`npm run deploy:all`) or set `CONTRACT_ADDRESS` in `backend/.env`.
-  The API can use `CONTRACT_ADDRESS` when `deployed.json` is not present.
-
-- `No ledger entries found for this case`
-  A report can only be generated after at least one successful evidence registration has synced a ledger entry through `POST /ledger/entry`.
-
-- `Failed to fetch` on commit/upload
-  Usually frontend cannot reach backend upload API.
-  Check:
-  - backend is running: `cd backend && npm run api`
-  - `http://localhost:3001/health` returns JSON
-  - `frontend/.env` and network mode:
-    - local Vite proxy mode: leave `VITE_BACKEND_URL` empty/commented
-    - direct backend mode: set `VITE_BACKEND_URL=http://localhost:3001`
-  - restart frontend after env changes
-
-- `Wallet is not an investigator`
-  Grant investigator access to the connected Sepolia wallet on the same contract address your app is using.
-
-- `Wallet is not an investigator` even after granting
-  Confirm there is no contract mismatch:
-  - frontend `VITE_EVIDENCE_REGISTRY_ADDRESS` (if set) must match deployed address in `frontend/src/contracts/deployed.json`
-  - backend `/health` `contractAddress` should match the same deployment
-  - connected MetaMask account is the same wallet that was granted
-
-- `no matching fragment` during contract calls
-  ABI/address mismatch. Run:
-  - `cd backend && npm run sync-artifacts`
-  - pull latest `frontend/src/contracts/evidenceRegistryAbi.json` and `frontend/src/contracts/deployed.json`
-
-- `Wrong network`
-  Make sure MetaMask is on Sepolia and `EXPECTED_CHAIN_ID` is `0xaa36a7`.
-
-- `Invalid IPFS URL`
-  Fix `PINATA_GATEWAY_BASE` so it looks like:
-  `https://your-gateway.mypinata.cloud/ipfs/`
-  If `/ipfs/` or `https://` is missing, generated links can fail in browser.
-
-- Hardhat warning on Node 25+
-  Hardhat 2.x is most stable on Node 20 LTS. Use Node 20 for deployment/test reliability.
-
-- No CID appears
-  Make sure:
-  - the backend is running
-  - the frontend is using the updated register flow
-  - the signature request succeeds
-  - the backend terminal shows no Pinata errors
-
-- `PINATA_JWT is missing in backend/.env`
-  Add a valid Pinata JWT to `backend/.env`.
-
-- Pinata upload fails
-  Regenerate the JWT in Pinata and update `backend/.env`.
-
-- Report generation fails after a successful on-chain commit
-  Check whether the success box showed a `Ledger Sync` warning. If it did, the blockchain write succeeded but the backend ledger entry failed, so the case will not be reportable until the ledger write succeeds.
+Configuration:
+- [backend/.env.example](/home/shubh/Project/Forensics-BT-mini-proj/backend/.env.example)
+- [frontend/.env.example](/home/shubh/Project/Forensics-BT-mini-proj/frontend/.env.example)
 
 ## Current Scope
-
-This project currently supports:
-- smart contract deployment with Hardhat
-- investigator-based evidence registration
-- protected Pinata uploads through the backend
-- storing returned Pinata CIDs on-chain
-- backend custody ledger persistence
-- JSON case report generation pinned to Pinata
-
-Planned future work includes:
-- PDF case summaries
-- richer custody event updates beyond registration
+The implemented system currently supports:
+- Hardhat-based contract development and deployment
+- investigator-gated evidence registration
+- IPFS storage through Pinata
+- per-case custody ledger persistence
+- evidence verification through file hash lookup
+- multi-investigator case reporting for shared case IDs
+- JSON report generation and Pinata pinning
+- PDF report export
