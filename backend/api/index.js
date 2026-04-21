@@ -220,23 +220,102 @@ function appendLedgerEntry(caseId, entry) {
   return nextEntry
 }
 
-async function readOnChainEvidence(fileHash) {
-  const [caseId, officerName, ipfsCid, uploader, timestamp, status] = await withRpcRetry(
-    () => contract.getEvidence(fileHash),
-    'Evidence read'
+async function getChainCaseRegistrations(caseId) {
+  const filter = contract.filters.EvidenceRegistered()
+  const logs = await withRpcRetry(
+    () => contract.queryFilter(filter, 0, 'latest'),
+    'Evidence event scan',
+    2
   )
-  const rawTimestamp = Number(timestamp)
-  const statusCode = Number(status)
 
+  const registrations = []
+  const txCache = new Map()
+
+  for (const log of logs) {
+    const fileHash = String(log.args?.fileHash ?? log.args?.[0] ?? '').trim()
+    if (!fileHash) continue
+
+    const txHash = String(log.transactionHash || '').trim()
+    let parsed = txCache.get(txHash)
+
+    if (!parsed) {
+      const tx = await withRpcRetry(
+        () => provider.getTransaction(txHash),
+        'Registration transaction read',
+        2
+      )
+
+      if (!tx) continue
+
+      try {
+        const description = contract.interface.parseTransaction({
+          data: tx.data,
+          value: tx.value
+        })
+
+        if (description?.name !== 'registerEvidence') {
+          continue
+        }
+
+        parsed = {
+          caseId: String(description.args?.[1] ?? '').trim(),
+          officerName: String(description.args?.[2] ?? '').trim()
+        }
+      } catch {
+        continue
+      }
+
+      txCache.set(txHash, parsed)
+    }
+
+    if (parsed.caseId !== caseId) {
+      continue
+    }
+
+    const statusCode = Number(log.args?.status ?? log.args?.[4] ?? 0)
+    const rawTimestamp = Number(log.args?.timestamp ?? log.args?.[2] ?? 0)
+    const ipfsCid = String(log.args?.ipfsCid ?? log.args?.[3] ?? '').trim()
+    const uploader = String(log.args?.uploader ?? log.args?.[1] ?? '').trim().toLowerCase()
+
+    registrations.push({
+      source: 'chain',
+      fileHash,
+      caseId: parsed.caseId,
+      officerName: parsed.officerName,
+      ipfsCid,
+      ipfsGatewayUrl: ipfsCid ? buildGatewayUrl(ipfsCid) : '',
+      uploader,
+      investigator: uploader,
+      timestamp: rawTimestamp ? new Date(rawTimestamp * 1000).toISOString() : null,
+      rawTimestamp,
+      statusCode,
+      statusLabel: getStatusLabel(statusCode),
+      txHash,
+      blockNumber: log.blockNumber ?? null
+    })
+  }
+
+  return registrations
+}
+
+function mergeEvidenceRecord(target, source) {
   return {
-    caseId,
-    officerName,
-    ipfsCid,
-    uploader,
-    timestamp: rawTimestamp ? new Date(rawTimestamp * 1000).toISOString() : null,
-    rawTimestamp,
-    statusCode,
-    statusLabel: getStatusLabel(statusCode)
+    fileHash: source.fileHash || target.fileHash || '',
+    caseId: source.caseId || target.caseId || '',
+    officerName: source.officerName || target.officerName || '',
+    ipfsCid: source.ipfsCid || target.ipfsCid || '',
+    ipfsGatewayUrl: source.ipfsGatewayUrl || target.ipfsGatewayUrl || '',
+    investigator: source.investigator || target.investigator || '',
+    uploader: source.uploader || target.uploader || '',
+    registeredAt: source.registeredAt || target.registeredAt || target.timestamp || source.timestamp || null,
+    custodyStatusCode: Number.isFinite(source.custodyStatusCode) ? source.custodyStatusCode : target.custodyStatusCode,
+    custodyStatusLabel: source.custodyStatusLabel || target.custodyStatusLabel || '',
+    txHash: source.txHash || target.txHash || '',
+    blockNumber: source.blockNumber ?? target.blockNumber ?? null,
+    notes: source.notes || target.notes || '',
+    evidenceType: source.evidenceType || target.evidenceType || '',
+    chainVerification: source.chainVerification || target.chainVerification || 'ledger-fallback',
+    chainReadError: source.chainReadError || target.chainReadError || null
   }
 }
 
@@ -471,21 +550,58 @@ app.post('/reports/:caseId', verifyInvestigator, async (req, res, next) => {
       return res.status(400).json({ error: 'Case ID is required.' })
     }
 
-    const ledger = readLedger(caseId)
-    if (!ledger || ledger.entries.length === 0) {
-      return res.status(404).json({ error: 'No ledger entries found for this case.' })
-    }
-
-    const registrationEntries = ledger.entries.filter(
+    const ledger = readLedger(caseId, { allowMissing: true })
+    const localRegistrations = ledger.entries.filter(
       (entry) => entry.type === 'EVIDENCE_REGISTERED' && entry.fileHash
     )
-    const uniqueFileHashes = [...new Set(registrationEntries.map((entry) => entry.fileHash))]
-    const contributorMap = new Map()
-    const evidence = []
-    let chainReadFailures = 0
+    const chainRegistrations = await getChainCaseRegistrations(caseId)
 
-    for (const entry of registrationEntries) {
-      const wallet = String(entry.investigator || entry.uploader || '').trim().toLowerCase()
+    if (localRegistrations.length === 0 && chainRegistrations.length === 0) {
+      return res.status(404).json({ error: 'No evidence found for this case.' })
+    }
+
+    const evidenceMap = new Map()
+
+    for (const item of chainRegistrations) {
+      evidenceMap.set(item.fileHash, mergeEvidenceRecord({}, {
+        ...item,
+        registeredAt: item.timestamp,
+        custodyStatusCode: item.statusCode,
+        custodyStatusLabel: item.statusLabel,
+        chainVerification: 'verified'
+      }))
+    }
+
+    for (const entry of localRegistrations) {
+      const existing = evidenceMap.get(entry.fileHash) || {}
+      evidenceMap.set(entry.fileHash, mergeEvidenceRecord(existing, {
+        fileHash: entry.fileHash,
+        caseId,
+        officerName: entry.officerName,
+        ipfsCid: entry.ipfsCid,
+        ipfsGatewayUrl: entry.gatewayUrl,
+        investigator: entry.investigator || entry.uploader || '',
+        uploader: entry.uploader || '',
+        registeredAt: entry.timestamp || entry.createdAt || null,
+        custodyStatusCode: Number(entry.statusCode ?? 0),
+        custodyStatusLabel: entry.statusLabel || getStatusLabel(entry.statusCode ?? 0),
+        txHash: entry.txHash,
+        blockNumber: entry.blockNumber,
+        notes: entry.notes,
+        evidenceType: entry.evidenceType,
+        chainVerification: existing.chainVerification || 'ledger-fallback'
+      }))
+    }
+
+    const evidence = [...evidenceMap.values()].sort((left, right) => {
+      const leftTime = Date.parse(left.registeredAt || '') || 0
+      const rightTime = Date.parse(right.registeredAt || '') || 0
+      return rightTime - leftTime
+    })
+
+    const contributorMap = new Map()
+    for (const item of evidence) {
+      const wallet = String(item.investigator || item.uploader || '').trim().toLowerCase()
       if (!wallet) continue
 
       const current = contributorMap.get(wallet) || {
@@ -495,56 +611,53 @@ app.post('/reports/:caseId', verifyInvestigator, async (req, res, next) => {
         latestActivityAt: null
       }
 
-      if (entry.officerName) {
-        current.officerNames.add(entry.officerName)
+      if (item.officerName) {
+        current.officerNames.add(item.officerName)
       }
 
       current.evidenceCount += 1
-
-      const timestamp = normaliseIsoTimestamp(entry.timestamp || entry.createdAt)
-      if (!current.latestActivityAt || timestamp > current.latestActivityAt) {
+      const timestamp = item.registeredAt ? normaliseIsoTimestamp(item.registeredAt) : null
+      if (timestamp && (!current.latestActivityAt || timestamp > current.latestActivityAt)) {
         current.latestActivityAt = timestamp
       }
-
       contributorMap.set(wallet, current)
     }
 
-    for (const fileHash of uniqueFileHashes) {
-      const registration = registrationEntries.find((entry) => entry.fileHash === fileHash)
-      let onChain = null
-      let chainReadError = null
+    const timelineByKey = new Map()
+    for (const entry of ledger.entries) {
+      timelineByKey.set(entry.id, { ...entry, source: entry.source || 'ledger' })
+    }
 
-      try {
-        onChain = await readOnChainEvidence(fileHash)
-      } catch (error) {
-        chainReadFailures += 1
-        chainReadError = error?.message || 'On-chain read failed.'
-      }
+    for (const item of chainRegistrations) {
+      const hasLocalEntry = localRegistrations.some(
+        (entry) => entry.fileHash === item.fileHash && entry.txHash === item.txHash
+      )
 
-      const resolvedCid = onChain?.ipfsCid || registration?.ipfsCid || ''
-      const resolvedStatusCode = onChain && Number.isFinite(onChain.statusCode)
-        ? onChain.statusCode
-        : Number(registration?.statusCode || 0)
+      if (hasLocalEntry) continue
 
-      evidence.push({
-        fileHash,
-        caseId: onChain?.caseId || caseId,
-        officerName: onChain?.officerName || registration?.officerName || '',
-        ipfsCid: resolvedCid,
-        ipfsGatewayUrl: resolvedCid ? buildGatewayUrl(resolvedCid) : registration?.gatewayUrl || '',
-        investigator: registration?.investigator || registration?.uploader || '',
-        uploader: onChain?.uploader || registration?.uploader || '',
-        registeredAt: onChain?.timestamp || registration?.timestamp || null,
-        custodyStatusCode: resolvedStatusCode,
-        custodyStatusLabel: onChain?.statusLabel || registration?.statusLabel || getStatusLabel(resolvedStatusCode),
-        txHash: registration?.txHash || '',
-        blockNumber: registration?.blockNumber ?? null,
-        notes: registration?.notes || '',
-        evidenceType: registration?.evidenceType || '',
-        chainVerification: onChain ? 'verified' : 'ledger-fallback',
-        chainReadError
+      const syntheticId = `chain-${item.txHash || item.fileHash}`
+      timelineByKey.set(syntheticId, {
+        id: syntheticId,
+        type: 'EVIDENCE_REGISTERED',
+        source: 'chain',
+        investigator: item.investigator,
+        uploader: item.uploader,
+        officerName: item.officerName,
+        fileHash: item.fileHash,
+        ipfsCid: item.ipfsCid,
+        txHash: item.txHash,
+        blockNumber: item.blockNumber,
+        timestamp: item.timestamp,
+        statusCode: item.statusCode,
+        statusLabel: item.statusLabel
       })
     }
+
+    const mergedTimeline = [...timelineByKey.values()].sort((left, right) => {
+      const leftTime = Date.parse(left.timestamp || left.createdAt || '') || 0
+      const rightTime = Date.parse(right.timestamp || right.createdAt || '') || 0
+      return rightTime - leftTime
+    })
 
     const contributors = [...contributorMap.values()]
       .map((entry) => ({
@@ -565,14 +678,14 @@ app.post('/reports/:caseId', verifyInvestigator, async (req, res, next) => {
       contractAddress: deployedAddress,
       summary: {
         evidenceCount: evidence.length,
-        ledgerEntryCount: ledger.entries.length,
-        latestLedgerUpdate: ledger.updatedAt,
+        ledgerEntryCount: mergedTimeline.length,
+        latestLedgerUpdate: mergedTimeline[0]?.timestamp || ledger.updatedAt,
         contributorCount: contributors.length,
-        chainReadFailures
+        chainReadFailures: 0
       },
       contributors,
       evidence,
-      ledgerEntries: ledger.entries
+      ledgerEntries: mergedTimeline
     }
 
     const pinataResult = await uploadJsonReportToPinata(reportContent, {
@@ -592,7 +705,7 @@ app.post('/reports/:caseId', verifyInvestigator, async (req, res, next) => {
       gatewayUrl: pinataResult.gatewayUrl,
       size: pinataResult.size,
       evidenceCount: evidence.length,
-      ledgerEntryCount: ledger.entries.length
+      ledgerEntryCount: mergedTimeline.length
     }
 
     ledger.reports.push(reportRecord)
@@ -620,12 +733,12 @@ app.post('/reports/:caseId', verifyInvestigator, async (req, res, next) => {
       reportGatewayUrl: reportRecord.gatewayUrl,
       reportSize: reportRecord.size,
       evidenceCount: evidence.length,
-      ledgerEntryCount: ledger.entries.length,
+      ledgerEntryCount: mergedTimeline.length,
       contributorCount: contributors.length,
-      chainReadFailures,
+      chainReadFailures: 0,
       contributors,
       evidence,
-      ledgerEntries: ledger.entries
+      ledgerEntries: mergedTimeline
     })
   } catch (error) {
     next(error)
