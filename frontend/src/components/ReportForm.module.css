@@ -162,6 +162,12 @@
   gap: 0.9rem 1.2rem;
 }
 
+.actionsRow {
+  margin-top: 1.2rem;
+  display: flex;
+  justify-content: flex-end;
+}
+
 .summaryGrid p,
 .contributorCard p,
 .evidenceCard p,

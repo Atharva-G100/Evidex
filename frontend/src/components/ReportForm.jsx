@@ -41,6 +41,7 @@ const ReportForm = ({ onBack }) => {
   const [status, setStatus] = useState('idle')
   const [errorMsg, setErrorMsg] = useState(null)
   const [reportData, setReportData] = useState(null)
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false)
 
   const generateReport = async () => {
     setErrorMsg(null)
@@ -84,6 +85,47 @@ const ReportForm = ({ onBack }) => {
     } catch (error) {
       setErrorMsg(error?.message || 'Failed to generate report.')
       setStatus('idle')
+    }
+  }
+
+  const downloadPdf = async () => {
+    if (!reportData?.caseId) return
+
+    try {
+      setErrorMsg(null)
+      setIsDownloadingPdf(true)
+      const signer = await getSigner()
+      const headers = await buildAuthenticatedHeaders({
+        account,
+        chainId,
+        signer,
+        contentType: 'application/json'
+      })
+
+      const response = await fetch(getApiUrl(`/reports/${encodeURIComponent(reportData.caseId)}/pdf`), {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({})
+      })
+
+      if (!response.ok) {
+        const message = await response.text()
+        throw new Error(message || 'Failed to generate PDF report.')
+      }
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `${reportData.caseId}-report.pdf`
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (error) {
+      setErrorMsg(error?.message || 'Failed to generate PDF report.')
+    } finally {
+      setIsDownloadingPdf(false)
     }
   }
 
@@ -165,6 +207,15 @@ const ReportForm = ({ onBack }) => {
                   </a>
                 )}
               </p>
+            </div>
+            <div className={styles.actionsRow}>
+              <button
+                className={styles.actionBtn}
+                onClick={downloadPdf}
+                disabled={isDownloadingPdf}
+              >
+                {isDownloadingPdf ? 'Generating PDF...' : 'Download PDF'}
+              </button>
             </div>
           </div>
 
