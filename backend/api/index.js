@@ -5,6 +5,13 @@ const path = require('path')
 const express = require('express')
 const multer = require('multer')
 const { JsonRpcProvider, Contract, verifyMessage, FetchRequest } = require('ethers')
+let PDFDocument = null
+
+try {
+  PDFDocument = require('pdfkit')
+} catch {
+  PDFDocument = null
+}
 
 const app = express()
 const upload = multer({
@@ -306,6 +313,225 @@ function mergeEvidenceRecord(target, source) {
   }
 }
 
+function buildContributorsFromEvidence(evidence) {
+  const contributorMap = new Map()
+
+  for (const item of evidence) {
+    const wallet = String(item.investigator || item.uploader || '').trim().toLowerCase()
+    if (!wallet) continue
+
+    const current = contributorMap.get(wallet) || {
+      wallet,
+      officerNames: new Set(),
+      evidenceCount: 0,
+      latestActivityAt: null
+    }
+
+    if (item.officerName) {
+      current.officerNames.add(item.officerName)
+    }
+
+    current.evidenceCount += 1
+    const timestamp = item.registeredAt ? normaliseIsoTimestamp(item.registeredAt) : null
+    if (timestamp && (!current.latestActivityAt || timestamp > current.latestActivityAt)) {
+      current.latestActivityAt = timestamp
+    }
+    contributorMap.set(wallet, current)
+  }
+
+  return [...contributorMap.values()]
+    .map((entry) => ({
+      wallet: entry.wallet,
+      officerNames: [...entry.officerNames],
+      evidenceCount: entry.evidenceCount,
+      latestActivityAt: entry.latestActivityAt
+    }))
+    .sort((left, right) => right.evidenceCount - left.evidenceCount)
+}
+
+function buildMergedTimeline(ledger, localRegistrations, chainRegistrations) {
+  const timelineByKey = new Map()
+
+  for (const entry of ledger.entries) {
+    timelineByKey.set(entry.id, { ...entry, source: entry.source || 'ledger' })
+  }
+
+  for (const item of chainRegistrations) {
+    const hasLocalEntry = localRegistrations.some(
+      (entry) => entry.fileHash === item.fileHash && entry.txHash === item.txHash
+    )
+
+    if (hasLocalEntry) continue
+
+    const syntheticId = `chain-${item.txHash || item.fileHash}`
+    timelineByKey.set(syntheticId, {
+      id: syntheticId,
+      type: 'EVIDENCE_REGISTERED',
+      source: 'chain',
+      investigator: item.investigator,
+      uploader: item.uploader,
+      officerName: item.officerName,
+      fileHash: item.fileHash,
+      ipfsCid: item.ipfsCid,
+      txHash: item.txHash,
+      blockNumber: item.blockNumber,
+      timestamp: item.timestamp,
+      statusCode: item.statusCode,
+      statusLabel: item.statusLabel
+    })
+  }
+
+  return [...timelineByKey.values()].sort((left, right) => {
+    const leftTime = Date.parse(left.timestamp || left.createdAt || '') || 0
+    const rightTime = Date.parse(right.timestamp || right.createdAt || '') || 0
+    return rightTime - leftTime
+  })
+}
+
+async function buildCaseReportData(caseId, requestedBy) {
+  const ledger = readLedger(caseId, { allowMissing: true })
+  const localRegistrations = ledger.entries.filter(
+    (entry) => entry.type === 'EVIDENCE_REGISTERED' && entry.fileHash
+  )
+  const chainRegistrations = await getChainCaseRegistrations(caseId)
+
+  if (localRegistrations.length === 0 && chainRegistrations.length === 0) {
+    return null
+  }
+
+  const evidenceMap = new Map()
+
+  for (const item of chainRegistrations) {
+    evidenceMap.set(item.fileHash, mergeEvidenceRecord({}, {
+      ...item,
+      registeredAt: item.timestamp,
+      custodyStatusCode: item.statusCode,
+      custodyStatusLabel: item.statusLabel,
+      chainVerification: 'verified'
+    }))
+  }
+
+  for (const entry of localRegistrations) {
+    const existing = evidenceMap.get(entry.fileHash) || {}
+    evidenceMap.set(entry.fileHash, mergeEvidenceRecord(existing, {
+      fileHash: entry.fileHash,
+      caseId,
+      officerName: entry.officerName,
+      ipfsCid: entry.ipfsCid,
+      ipfsGatewayUrl: entry.gatewayUrl,
+      investigator: entry.investigator || entry.uploader || '',
+      uploader: entry.uploader || '',
+      registeredAt: entry.timestamp || entry.createdAt || null,
+      custodyStatusCode: Number(entry.statusCode ?? 0),
+      custodyStatusLabel: entry.statusLabel || getStatusLabel(entry.statusCode ?? 0),
+      txHash: entry.txHash,
+      blockNumber: entry.blockNumber,
+      notes: entry.notes,
+      evidenceType: entry.evidenceType,
+      chainVerification: existing.chainVerification || 'ledger-fallback'
+    }))
+  }
+
+  const evidence = [...evidenceMap.values()].sort((left, right) => {
+    const leftTime = Date.parse(left.registeredAt || '') || 0
+    const rightTime = Date.parse(right.registeredAt || '') || 0
+    return rightTime - leftTime
+  })
+
+  const contributors = buildContributorsFromEvidence(evidence)
+  const mergedTimeline = buildMergedTimeline(ledger, localRegistrations, chainRegistrations)
+  const generatedAt = new Date().toISOString()
+
+  return {
+    ledger,
+    localRegistrations,
+    chainRegistrations,
+    generatedAt,
+    caseId,
+    generatedBy: requestedBy,
+    network: NETWORK_NAME,
+    contractAddress: deployedAddress,
+    evidence,
+    contributors,
+    ledgerEntries: mergedTimeline,
+    summary: {
+      evidenceCount: evidence.length,
+      ledgerEntryCount: mergedTimeline.length,
+      latestLedgerUpdate: mergedTimeline[0]?.timestamp || ledger.updatedAt,
+      contributorCount: contributors.length,
+      chainReadFailures: 0
+    }
+  }
+}
+
+function createPdfBuffer(report) {
+  if (!PDFDocument) {
+    throw new Error('PDF export is unavailable. Install pdfkit in backend first.')
+  }
+
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ margin: 48, size: 'A4' })
+    const chunks = []
+
+    doc.on('data', (chunk) => chunks.push(chunk))
+    doc.on('end', () => resolve(Buffer.concat(chunks)))
+    doc.on('error', reject)
+
+    doc.fontSize(18).text('Evidence Case Report', { underline: true })
+    doc.moveDown(0.6)
+    doc.fontSize(11)
+    doc.text(`Case ID: ${report.caseId}`)
+    doc.text(`Generated At: ${report.generatedAt}`)
+    doc.text(`Generated By: ${report.generatedBy}`)
+    doc.text(`Contract: ${report.contractAddress}`)
+    doc.text(`Network: ${String(report.network || '').toUpperCase()}`)
+    doc.text(`Evidence Count: ${report.summary.evidenceCount}`)
+    doc.text(`Contributors: ${report.summary.contributorCount}`)
+    doc.moveDown()
+
+    doc.fontSize(14).text('Investigators', { underline: true })
+    doc.moveDown(0.4)
+    report.contributors.forEach((item) => {
+      doc.fontSize(10).text(`Wallet: ${item.wallet}`)
+      doc.text(`Evidence Added: ${item.evidenceCount}`)
+      doc.text(`Officer Names: ${item.officerNames.join(', ') || 'Unavailable'}`)
+      doc.text(`Latest Activity: ${item.latestActivityAt || 'Unavailable'}`)
+      doc.moveDown(0.5)
+    })
+
+    doc.fontSize(14).text('Evidence Summary', { underline: true })
+    doc.moveDown(0.4)
+    report.evidence.forEach((item, index) => {
+      doc.fontSize(10).text(`${index + 1}. File Hash: ${item.fileHash}`)
+      doc.text(`   Officer: ${item.officerName || 'Unavailable'}`)
+      doc.text(`   Investigator: ${item.investigator || 'Unavailable'}`)
+      doc.text(`   Status: ${item.custodyStatusLabel}`)
+      doc.text(`   Registered: ${item.registeredAt || 'Unavailable'}`)
+      doc.text(`   IPFS CID: ${item.ipfsCid || 'Unavailable'}`)
+      if (item.txHash) {
+        doc.text(`   TX Hash: ${item.txHash}`)
+      }
+      doc.moveDown(0.5)
+    })
+
+    doc.fontSize(14).text('Timeline', { underline: true })
+    doc.moveDown(0.4)
+    report.ledgerEntries.forEach((entry, index) => {
+      doc.fontSize(10).text(`${index + 1}. ${entry.type} | ${entry.timestamp || entry.createdAt || 'Unavailable'}`)
+      doc.text(`   Investigator: ${entry.investigator || 'Unavailable'}`)
+      if (entry.fileHash) {
+        doc.text(`   File Hash: ${entry.fileHash}`)
+      }
+      if (entry.txHash) {
+        doc.text(`   TX Hash: ${entry.txHash}`)
+      }
+      doc.moveDown(0.4)
+    })
+
+    doc.end()
+  })
+}
+
 const artifact = loadJson(artifactPath)
 const rpcRequest = new FetchRequest(RPC_URL)
 rpcRequest.timeout = RPC_TIMEOUT_MS
@@ -537,142 +763,9 @@ app.post('/reports/:caseId', verifyInvestigator, async (req, res, next) => {
       return res.status(400).json({ error: 'Case ID is required.' })
     }
 
-    const ledger = readLedger(caseId, { allowMissing: true })
-    const localRegistrations = ledger.entries.filter(
-      (entry) => entry.type === 'EVIDENCE_REGISTERED' && entry.fileHash
-    )
-    const chainRegistrations = await getChainCaseRegistrations(caseId)
-
-    if (localRegistrations.length === 0 && chainRegistrations.length === 0) {
+    const reportContent = await buildCaseReportData(caseId, req.investigator)
+    if (!reportContent) {
       return res.status(404).json({ error: 'No evidence found for this case.' })
-    }
-
-    const evidenceMap = new Map()
-
-    for (const item of chainRegistrations) {
-      evidenceMap.set(item.fileHash, mergeEvidenceRecord({}, {
-        ...item,
-        registeredAt: item.timestamp,
-        custodyStatusCode: item.statusCode,
-        custodyStatusLabel: item.statusLabel,
-        chainVerification: 'verified'
-      }))
-    }
-
-    for (const entry of localRegistrations) {
-      const existing = evidenceMap.get(entry.fileHash) || {}
-      evidenceMap.set(entry.fileHash, mergeEvidenceRecord(existing, {
-        fileHash: entry.fileHash,
-        caseId,
-        officerName: entry.officerName,
-        ipfsCid: entry.ipfsCid,
-        ipfsGatewayUrl: entry.gatewayUrl,
-        investigator: entry.investigator || entry.uploader || '',
-        uploader: entry.uploader || '',
-        registeredAt: entry.timestamp || entry.createdAt || null,
-        custodyStatusCode: Number(entry.statusCode ?? 0),
-        custodyStatusLabel: entry.statusLabel || getStatusLabel(entry.statusCode ?? 0),
-        txHash: entry.txHash,
-        blockNumber: entry.blockNumber,
-        notes: entry.notes,
-        evidenceType: entry.evidenceType,
-        chainVerification: existing.chainVerification || 'ledger-fallback'
-      }))
-    }
-
-    const evidence = [...evidenceMap.values()].sort((left, right) => {
-      const leftTime = Date.parse(left.registeredAt || '') || 0
-      const rightTime = Date.parse(right.registeredAt || '') || 0
-      return rightTime - leftTime
-    })
-
-    const contributorMap = new Map()
-    for (const item of evidence) {
-      const wallet = String(item.investigator || item.uploader || '').trim().toLowerCase()
-      if (!wallet) continue
-
-      const current = contributorMap.get(wallet) || {
-        wallet,
-        officerNames: new Set(),
-        evidenceCount: 0,
-        latestActivityAt: null
-      }
-
-      if (item.officerName) {
-        current.officerNames.add(item.officerName)
-      }
-
-      current.evidenceCount += 1
-      const timestamp = item.registeredAt ? normaliseIsoTimestamp(item.registeredAt) : null
-      if (timestamp && (!current.latestActivityAt || timestamp > current.latestActivityAt)) {
-        current.latestActivityAt = timestamp
-      }
-      contributorMap.set(wallet, current)
-    }
-
-    const timelineByKey = new Map()
-    for (const entry of ledger.entries) {
-      timelineByKey.set(entry.id, { ...entry, source: entry.source || 'ledger' })
-    }
-
-    for (const item of chainRegistrations) {
-      const hasLocalEntry = localRegistrations.some(
-        (entry) => entry.fileHash === item.fileHash && entry.txHash === item.txHash
-      )
-
-      if (hasLocalEntry) continue
-
-      const syntheticId = `chain-${item.txHash || item.fileHash}`
-      timelineByKey.set(syntheticId, {
-        id: syntheticId,
-        type: 'EVIDENCE_REGISTERED',
-        source: 'chain',
-        investigator: item.investigator,
-        uploader: item.uploader,
-        officerName: item.officerName,
-        fileHash: item.fileHash,
-        ipfsCid: item.ipfsCid,
-        txHash: item.txHash,
-        blockNumber: item.blockNumber,
-        timestamp: item.timestamp,
-        statusCode: item.statusCode,
-        statusLabel: item.statusLabel
-      })
-    }
-
-    const mergedTimeline = [...timelineByKey.values()].sort((left, right) => {
-      const leftTime = Date.parse(left.timestamp || left.createdAt || '') || 0
-      const rightTime = Date.parse(right.timestamp || right.createdAt || '') || 0
-      return rightTime - leftTime
-    })
-
-    const contributors = [...contributorMap.values()]
-      .map((entry) => ({
-        wallet: entry.wallet,
-        officerNames: [...entry.officerNames],
-        evidenceCount: entry.evidenceCount,
-        latestActivityAt: entry.latestActivityAt
-      }))
-      .sort((left, right) => right.evidenceCount - left.evidenceCount)
-
-    const generatedAt = new Date().toISOString()
-    const reportContent = {
-      reportVersion: 1,
-      caseId,
-      generatedAt,
-      generatedBy: req.investigator,
-      network: NETWORK_NAME,
-      contractAddress: deployedAddress,
-      summary: {
-        evidenceCount: evidence.length,
-        ledgerEntryCount: mergedTimeline.length,
-        latestLedgerUpdate: mergedTimeline[0]?.timestamp || ledger.updatedAt,
-        contributorCount: contributors.length,
-        chainReadFailures: 0
-      },
-      contributors,
-      evidence,
-      ledgerEntries: mergedTimeline
     }
 
     const pinataResult = await uploadJsonReportToPinata(reportContent, {
@@ -686,22 +779,23 @@ app.post('/reports/:caseId', verifyInvestigator, async (req, res, next) => {
 
     const reportRecord = {
       id: `report-${Date.now()}`,
-      generatedAt,
+      generatedAt: reportContent.generatedAt,
       generatedBy: req.investigator,
       cid: pinataResult.cid,
       gatewayUrl: pinataResult.gatewayUrl,
       size: pinataResult.size,
-      evidenceCount: evidence.length,
-      ledgerEntryCount: mergedTimeline.length
+      evidenceCount: reportContent.evidence.length,
+      ledgerEntryCount: reportContent.ledgerEntries.length
     }
 
+    const ledger = reportContent.ledger
     ledger.reports.push(reportRecord)
-    ledger.updatedAt = generatedAt
+    ledger.updatedAt = reportContent.generatedAt
     ledger.entries.push({
       id: `entry-${Date.now()}-${ledger.entries.length + 1}`,
       type: 'REPORT_GENERATED',
-      createdAt: generatedAt,
-      timestamp: generatedAt,
+      createdAt: reportContent.generatedAt,
+      timestamp: reportContent.generatedAt,
       investigator: req.investigator,
       reportId: reportRecord.id,
       reportCid: reportRecord.cid,
@@ -712,21 +806,42 @@ app.post('/reports/:caseId', verifyInvestigator, async (req, res, next) => {
     res.status(200).json({
       ok: true,
       caseId,
-      generatedAt,
+      generatedAt: reportContent.generatedAt,
       generatedBy: req.investigator,
       contractAddress: deployedAddress,
       network: NETWORK_NAME,
       reportCid: reportRecord.cid,
       reportGatewayUrl: reportRecord.gatewayUrl,
       reportSize: reportRecord.size,
-      evidenceCount: evidence.length,
-      ledgerEntryCount: mergedTimeline.length,
-      contributorCount: contributors.length,
-      chainReadFailures: 0,
-      contributors,
-      evidence,
-      ledgerEntries: mergedTimeline
+      evidenceCount: reportContent.evidence.length,
+      ledgerEntryCount: reportContent.ledgerEntries.length,
+      contributorCount: reportContent.contributors.length,
+      chainReadFailures: reportContent.summary.chainReadFailures,
+      contributors: reportContent.contributors,
+      evidence: reportContent.evidence,
+      ledgerEntries: reportContent.ledgerEntries
     })
+  } catch (error) {
+    next(error)
+  }
+})
+
+app.post('/reports/:caseId/pdf', verifyInvestigator, async (req, res, next) => {
+  try {
+    const caseId = String(req.params.caseId || '').trim()
+    if (!caseId) {
+      return res.status(400).json({ error: 'Case ID is required.' })
+    }
+
+    const reportContent = await buildCaseReportData(caseId, req.investigator)
+    if (!reportContent) {
+      return res.status(404).json({ error: 'No evidence found for this case.' })
+    }
+
+    const pdfBuffer = await createPdfBuffer(reportContent)
+    res.setHeader('Content-Type', 'application/pdf')
+    res.setHeader('Content-Disposition', `attachment; filename="${sanitiseCaseId(caseId)}-report.pdf"`)
+    res.status(200).send(pdfBuffer)
   } catch (error) {
     next(error)
   }
