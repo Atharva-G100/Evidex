@@ -7,7 +7,9 @@ export default defineConfig({
   server: {
     proxy: {
       '/pinata': 'http://localhost:3001',
-      '/health': 'http://localhost:3001'
+      '/health': 'http://localhost:3001',
+      '/ledger': 'http://localhost:3001',
+      '/reports': 'http://localhost:3001'
     }
   }
 })

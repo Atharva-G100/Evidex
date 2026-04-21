@@ -5,6 +5,7 @@
 - The React frontend hashes files locally, uploads the original file to Pinata through a protected backend API, and stores the returned CID on-chain.
 - The `backend/scripts/sync-artifacts.js` script keeps the frontend ABI and deployed address in sync with Hardhat artifacts.
 - The backend exposes `POST /pinata/upload`, verifies the caller is an investigator, uploads the file to Pinata with a server-side JWT, and returns `{ cid, gatewayUrl, size }`.
+- The backend persists per-case ledger files in `backend/ledger/`, accepts `POST /ledger/entry`, and can generate/pin JSON case reports through `POST /reports/:caseId`.
 - The UI shows a clickable `Open` link next to IPFS CID values and uses `DD/MM/YYYY HH:mm:ss` timestamps in register/verify/footer views.
 
 ## Prerequisites
@@ -27,6 +28,8 @@
    - `PINATA_GATEWAY_BASE`
    - optional: `BACKEND_PORT`
    - optional: `EXPECTED_CHAIN_ID`
+   - optional: `LEDGER_DIR`
+   - optional: `NETWORK_NAME`
 
 Example:
 
@@ -37,6 +40,8 @@ PINATA_JWT=your_pinata_jwt
 PINATA_GATEWAY_BASE=https://your-gateway.mypinata.cloud/ipfs/
 BACKEND_PORT=3001
 EXPECTED_CHAIN_ID=0xaa36a7
+LEDGER_DIR=ledger
+NETWORK_NAME=sepolia
 ```
 
 Notes:
@@ -56,6 +61,7 @@ What these do:
 - `test` runs the Hardhat test suite.
 - `deploy:all` deploys the contract and syncs ABI/address files to the frontend.
 - `api` starts the Pinata upload API at `http://localhost:3001` by default.
+- `api` also serves ledger persistence and case report generation.
 
 ## Pinata Setup
 
@@ -148,6 +154,19 @@ When you register evidence:
    - transaction hash
    - block number
    - timestamp
+9. After the transaction is mined, the frontend posts a matching custody ledger entry to the backend for later report generation.
+
+## Reporting Flow
+
+1. Open `Case Reports` from the dashboard.
+2. Enter a case ID that already has registered evidence.
+3. Approve the MetaMask signature prompt.
+4. The backend reads `backend/ledger/<caseId>.json`, cross-checks each evidence hash on-chain, assembles a JSON report, and pins it to Pinata.
+5. The frontend shows:
+   - report CID with `Open` link
+   - case summary
+   - evidence list
+   - ledger-backed timeline
 
 ## Investigator Management
 
@@ -168,6 +187,7 @@ Frontend:
 - Confirm the success box shows an `IPFS CID`.
 - Open the `IPFS URL` in a browser and confirm the file resolves.
 - Verify the same file on the `Verify Evidence` screen.
+- Generate a case report and confirm the `Report CID` opens from Pinata.
 
 ## Troubleshooting
 
@@ -193,6 +213,9 @@ Frontend:
 - `Missing required file: .../backend/artifacts/deployed.json`
   Either run a deployment flow (`npm run deploy:all`) or set `CONTRACT_ADDRESS` in `backend/.env`.
   The API can use `CONTRACT_ADDRESS` when `deployed.json` is not present.
+
+- `No ledger entries found for this case`
+  A report can only be generated after at least one successful evidence registration has synced a ledger entry through `POST /ledger/entry`.
 
 - `Failed to fetch` on commit/upload
   Usually frontend cannot reach backend upload API.
@@ -242,6 +265,9 @@ Frontend:
 - Pinata upload fails
   Regenerate the JWT in Pinata and update `backend/.env`.
 
+- Report generation fails after a successful on-chain commit
+  Check whether the success box showed a `Ledger Sync` warning. If it did, the blockchain write succeeded but the backend ledger entry failed, so the case will not be reportable until the ledger write succeeds.
+
 ## Current Scope
 
 This project currently supports:
@@ -249,8 +275,9 @@ This project currently supports:
 - investigator-based evidence registration
 - protected Pinata uploads through the backend
 - storing returned Pinata CIDs on-chain
+- backend custody ledger persistence
+- JSON case report generation pinned to Pinata
 
 Planned future work includes:
-- custody ledger storage
-- report generation
-- PDF/JSON case summaries
+- PDF case summaries
+- richer custody event updates beyond registration
