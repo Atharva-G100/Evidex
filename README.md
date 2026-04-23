@@ -6,13 +6,13 @@ This project is a forensic evidence management system built around an Ethereum s
 The system is divided into three major layers:
 
 1. Smart contract layer
-   - [EvidenceRegistry.sol](/home/shubh/Project/Forensics-BT-mini-proj/backend/contracts/EvidenceRegistry.sol)
+   - `backend/contracts/EvidenceRegistry.sol`
    - Stores evidence records by file hash
    - Stores `caseId`, officer name, IPFS CID, uploader, timestamp, and custody status
    - Enforces investigator-only registration and custody updates
 
 2. Backend service layer
-   - [api/index.js](/home/shubh/Project/Forensics-BT-mini-proj/backend/api/index.js)
+   - `backend/api/index.js`
    - Verifies investigator access using signed wallet requests plus on-chain role checks
    - Uploads files and generated reports to Pinata
    - Persists case-level ledger files in `backend/ledger/`
@@ -20,18 +20,18 @@ The system is divided into three major layers:
    - Exposes PDF export for case reports
 
 3. Frontend interface layer
-   - [App.jsx](/home/shubh/Project/Forensics-BT-mini-proj/frontend/src/App.jsx)
-   - [Dashboard.jsx](/home/shubh/Project/Forensics-BT-mini-proj/frontend/src/pages/Dashboard.jsx)
-   - [RegisterForm.jsx](/home/shubh/Project/Forensics-BT-mini-proj/frontend/src/components/RegisterForm.jsx)
-   - [VerifyForm.jsx](/home/shubh/Project/Forensics-BT-mini-proj/frontend/src/components/VerifyForm.jsx)
-   - [ReportForm.jsx](/home/shubh/Project/Forensics-BT-mini-proj/frontend/src/components/ReportForm.jsx)
+   - `frontend/src/App.jsx`
+   - `frontend/src/pages/Dashboard.jsx`
+   - `frontend/src/components/RegisterForm.jsx`
+   - `frontend/src/components/VerifyForm.jsx`
+   - `frontend/src/components/ReportForm.jsx`
    - Provides investigator workflows for evidence registration, verification, investigator management, JSON report generation, and PDF download
 
 The artifact sync layer connects Hardhat output to the frontend:
-- [deploy.js](/home/shubh/Project/Forensics-BT-mini-proj/backend/scripts/deploy.js)
-- [sync-artifacts.js](/home/shubh/Project/Forensics-BT-mini-proj/backend/scripts/sync-artifacts.js)
-- [evidenceRegistryAbi.json](/home/shubh/Project/Forensics-BT-mini-proj/frontend/src/contracts/evidenceRegistryAbi.json)
-- [deployed.json](/home/shubh/Project/Forensics-BT-mini-proj/frontend/src/contracts/deployed.json)
+- `backend/scripts/deploy.js`
+- `backend/scripts/sync-artifacts.js`
+- `frontend/src/contracts/evidenceRegistryAbi.json`
+- `frontend/src/contracts/deployed.json`
 
 ## Prerequisites
 The following software and accounts are required before installation:
@@ -62,7 +62,7 @@ The backend compiles and serves the contract artifacts, verifies investigator ac
 
 ### Step 1: Enter the backend directory
 ```bash
-cd /home/shubh/Project/Forensics-BT-mini-proj/backend
+cd backend
 ```
 
 ### Step 2: Install dependencies
@@ -153,7 +153,7 @@ Cause:
 
 Fix:
 ```bash
-cd /home/shubh/Project/Forensics-BT-mini-proj/backend
+cd backend
 npm install
 npm run compile
 ```
@@ -225,7 +225,7 @@ The frontend provides the investigator dashboard, evidence registration workflow
 
 ### Step 1: Enter the frontend directory
 ```bash
-cd /home/shubh/Project/Forensics-BT-mini-proj/frontend
+cd frontend
 ```
 
 ### Step 2: Install dependencies
@@ -285,7 +285,7 @@ Cause:
 
 Fix:
 ```bash
-cd /home/shubh/Project/Forensics-BT-mini-proj/backend
+cd backend
 npm run sync-artifacts
 ```
 
@@ -309,13 +309,13 @@ The standard execution sequence is:
 
 ### 1. Start the backend
 ```bash
-cd /home/shubh/Project/Forensics-BT-mini-proj/backend
+cd backend
 npm run api
 ```
 
 ### 2. Start the frontend
 ```bash
-cd /home/shubh/Project/Forensics-BT-mini-proj/frontend
+cd frontend
 npm run dev
 ```
 
@@ -343,8 +343,8 @@ http://localhost:5173
 ## Operational Workflows
 ### 1. Register Evidence
 The registration flow is handled primarily by:
-- [RegisterForm.jsx](/home/shubh/Project/Forensics-BT-mini-proj/frontend/src/components/RegisterForm.jsx)
-- [api/index.js](/home/shubh/Project/Forensics-BT-mini-proj/backend/api/index.js)
+- `frontend/src/components/RegisterForm.jsx`
+- `backend/api/index.js`
 
 Process:
 1. Select a file
@@ -361,7 +361,7 @@ Outcome:
 
 ### 2. Verify Evidence
 The verification flow is handled by:
-- [VerifyForm.jsx](/home/shubh/Project/Forensics-BT-mini-proj/frontend/src/components/VerifyForm.jsx)
+- `frontend/src/components/VerifyForm.jsx`
 
 Process:
 1. Select a file
@@ -378,7 +378,7 @@ Outcome:
 
 ### 3. Investigator Management
 Handled by:
-- [InvestigatorPanel.jsx](/home/shubh/Project/Forensics-BT-mini-proj/frontend/src/components/InvestigatorPanel.jsx)
+- `frontend/src/components/InvestigatorPanel.jsx`
 
 Capabilities:
 - display active contract address
@@ -387,8 +387,8 @@ Capabilities:
 
 ### 4. Case Reporting
 Handled by:
-- [ReportForm.jsx](/home/shubh/Project/Forensics-BT-mini-proj/frontend/src/components/ReportForm.jsx)
-- [api/index.js](/home/shubh/Project/Forensics-BT-mini-proj/backend/api/index.js)
+- `frontend/src/components/ReportForm.jsx`
+- `backend/api/index.js`
 
 Process:
 1. Enter a case ID
@@ -410,24 +410,24 @@ Important:
 
 ## Summary of Important Files
 Backend:
-- [backend/contracts/EvidenceRegistry.sol](/home/shubh/Project/Forensics-BT-mini-proj/backend/contracts/EvidenceRegistry.sol)
-- [backend/api/index.js](/home/shubh/Project/Forensics-BT-mini-proj/backend/api/index.js)
-- [backend/scripts/deploy.js](/home/shubh/Project/Forensics-BT-mini-proj/backend/scripts/deploy.js)
-- [backend/scripts/sync-artifacts.js](/home/shubh/Project/Forensics-BT-mini-proj/backend/scripts/sync-artifacts.js)
-- [backend/test/EvidenceRegistry.test.js](/home/shubh/Project/Forensics-BT-mini-proj/backend/test/EvidenceRegistry.test.js)
+- `backend/contracts/EvidenceRegistry.sol`
+- `backend/api/index.js`
+- `backend/scripts/deploy.js`
+- `backend/scripts/sync-artifacts.js`
+- `backend/test/EvidenceRegistry.test.js`
 
 Frontend:
-- [frontend/src/App.jsx](/home/shubh/Project/Forensics-BT-mini-proj/frontend/src/App.jsx)
-- [frontend/src/pages/Dashboard.jsx](/home/shubh/Project/Forensics-BT-mini-proj/frontend/src/pages/Dashboard.jsx)
-- [frontend/src/components/RegisterForm.jsx](/home/shubh/Project/Forensics-BT-mini-proj/frontend/src/components/RegisterForm.jsx)
-- [frontend/src/components/VerifyForm.jsx](/home/shubh/Project/Forensics-BT-mini-proj/frontend/src/components/VerifyForm.jsx)
-- [frontend/src/components/ReportForm.jsx](/home/shubh/Project/Forensics-BT-mini-proj/frontend/src/components/ReportForm.jsx)
-- [frontend/src/components/InvestigatorPanel.jsx](/home/shubh/Project/Forensics-BT-mini-proj/frontend/src/components/InvestigatorPanel.jsx)
-- [frontend/src/contracts/evidenceRegistry.js](/home/shubh/Project/Forensics-BT-mini-proj/frontend/src/contracts/evidenceRegistry.js)
+- `frontend/src/App.jsx`
+- `frontend/src/pages/Dashboard.jsx`
+- `frontend/src/components/RegisterForm.jsx`
+- `frontend/src/components/VerifyForm.jsx`
+- `frontend/src/components/ReportForm.jsx`
+- `frontend/src/components/InvestigatorPanel.jsx`
+- `frontend/src/contracts/evidenceRegistry.js`
 
 Configuration:
-- [backend/.env.example](/home/shubh/Project/Forensics-BT-mini-proj/backend/.env.example)
-- [frontend/.env.example](/home/shubh/Project/Forensics-BT-mini-proj/frontend/.env.example)
+- `backend/.env.example`
+- `frontend/.env.example`
 
 ## Current Scope
 The implemented system currently supports:
