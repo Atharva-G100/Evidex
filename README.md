@@ -92,21 +92,6 @@ Required:
 - `PINATA_JWT`
 - `PINATA_GATEWAY_BASE`
 
-Example:
-```env
-SEPOLIA_RPC_URL=https://sepolia.infura.io/v3/YOUR_PROJECT_ID
-PRIVATE_KEY=0xyourdeployerprivatekey
-PINATA_JWT=your_pinata_jwt
-PINATA_GATEWAY_BASE=https://your-gateway.mypinata.cloud/ipfs/
-CONTRACT_ADDRESS=0xYourDeployedContractAddress
-BACKEND_PORT=3001
-EXPECTED_CHAIN_ID=0xaa36a7
-LEDGER_DIR=ledger
-NETWORK_NAME=sepolia
-RPC_TIMEOUT_MS=30000
-INVESTIGATOR_CACHE_TTL_MS=600000
-```
-
 ### Step 5: Compile the contract
 ```bash
 npm run compile
